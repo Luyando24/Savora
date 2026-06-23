@@ -359,7 +359,7 @@ export default function DashboardView() {
             .filter((g: any) => g !== null);
           setAlternateGroups(mappedGroups);
 
-          const activeMembership = userMemberships.find(m => m.group_id === queryId) || userMemberships[0];
+          const activeMembership = userMemberships.find((m: any) => m.group_id === queryId) || userMemberships[0];
           if (activeMembership) {
             setUserName(activeMembership.name || "");
             setUserRole(activeMembership.role === "treasurer" ? "Group Treasurer" : "Group Member");
