@@ -28,6 +28,7 @@ interface GroupFormData {
   chilimbaContributionAmount: string;
   chilimbaFrequency: "weekly" | "monthly" | "anytime";
   chilimbaRotationMethod: "random" | "ordered" | "manual";
+  chilimbaIsFlexibleContribution: boolean;
   
   // Co-op rules
   coopSharePrice: string;
@@ -59,6 +60,7 @@ const initialFormData: GroupFormData = {
   chilimbaContributionAmount: "150",
   chilimbaFrequency: "weekly",
   chilimbaRotationMethod: "random",
+  chilimbaIsFlexibleContribution: false,
   
   coopSharePrice: "200",
   coopMaxShares: "100",
@@ -145,9 +147,11 @@ export default function CreateGroupForm() {
 
     if (currentStep === 3) {
       if (formData.type === "savings") {
-        const amt = parseFloat(formData.chilimbaContributionAmount);
-        if (isNaN(amt) || amt <= 0) {
-          newErrors.chilimbaContributionAmount = "Contribution amount must be a positive number.";
+        if (!formData.chilimbaIsFlexibleContribution) {
+          const amt = parseFloat(formData.chilimbaContributionAmount);
+          if (isNaN(amt) || amt <= 0) {
+            newErrors.chilimbaContributionAmount = "Contribution amount must be a positive number.";
+          }
         }
       } else if (formData.type === "agricultural") {
         const price = parseFloat(formData.coopSharePrice);
@@ -235,9 +239,10 @@ export default function CreateGroupForm() {
         walletProvider: formData.walletProvider,
         walletHolderName: formData.walletHolderName,
         ...(formData.type === "savings" ? {
-          contributionAmount: parseFloat(formData.chilimbaContributionAmount) || 0,
+          contributionAmount: formData.chilimbaIsFlexibleContribution ? 0 : (parseFloat(formData.chilimbaContributionAmount) || 0),
           frequency: formData.chilimbaFrequency,
-          rotationMethod: formData.chilimbaRotationMethod
+          rotationMethod: formData.chilimbaRotationMethod,
+          isFlexibleContribution: formData.chilimbaIsFlexibleContribution
         } : formData.type === "agricultural" ? {
           sharePrice: parseFloat(formData.coopSharePrice) || 0,
           maxShares: parseInt(formData.coopMaxShares) || 0,
@@ -329,7 +334,10 @@ export default function CreateGroupForm() {
             <div className="flex justify-between">
               <dt className="font-light">Rules Summary:</dt>
               <dd className="text-[#001C3D] font-medium text-right">
-                {formData.type === "savings" && `ZMW ${formData.chilimbaContributionAmount} / member (${formData.chilimbaFrequency === "anytime" ? "Anytime" : formData.chilimbaFrequency})`}
+                {formData.type === "savings" && (formData.chilimbaIsFlexibleContribution 
+                  ? `Flexible Contribution / member (${formData.chilimbaFrequency === "anytime" ? "Anytime" : formData.chilimbaFrequency})`
+                  : `ZMW ${formData.chilimbaContributionAmount} / member (${formData.chilimbaFrequency === "anytime" ? "Anytime" : formData.chilimbaFrequency})`
+                )}
                 {formData.type === "agricultural" && `ZMW ${formData.coopSharePrice} share price, max ${formData.coopMaxShares} shares`}
                 {formData.type === "sacco" && `ZMW ${formData.saccoMinBalanceToBorrow} min bal, ${formData.saccoInterestRate}% interest`}
               </dd>
@@ -633,14 +641,29 @@ export default function CreateGroupForm() {
                     <input
                       type="number"
                       id="chilimba-amt"
-                      value={formData.chilimbaContributionAmount}
+                      value={formData.chilimbaIsFlexibleContribution ? "" : formData.chilimbaContributionAmount}
+                      disabled={formData.chilimbaIsFlexibleContribution}
                       onChange={(e) => updateField("chilimbaContributionAmount", e.target.value)}
-                      className={`w-full border rounded-lg p-3 pl-12 text-sm focus:outline-none focus:ring-1 focus:ring-[#0070BA] ${
+                      placeholder={formData.chilimbaIsFlexibleContribution ? "Flexible (Any Amount)" : "150"}
+                      className={`w-full border rounded-lg p-3 pl-12 text-sm focus:outline-none focus:ring-1 focus:ring-[#0070BA] disabled:bg-slate-50 disabled:text-slate-400 ${
                         errors.chilimbaContributionAmount ? "border-[#E11900]" : "border-[#EBEBEB]"
                       }`}
                     />
                   </div>
                   {errors.chilimbaContributionAmount && <span className="text-xs text-[#E11900] font-medium">{errors.chilimbaContributionAmount}</span>}
+                </div>
+
+                <div className="flex items-center gap-2 md:col-span-2">
+                  <input
+                    type="checkbox"
+                    id="chilimba-flexible"
+                    checked={formData.chilimbaIsFlexibleContribution}
+                    onChange={(e) => updateField("chilimbaIsFlexibleContribution", e.target.checked)}
+                    className="h-4 w-4 rounded border-gray-300 text-[#0070BA] focus:ring-[#0070BA] cursor-pointer"
+                  />
+                  <label htmlFor="chilimba-flexible" className="text-xs font-bold text-slate-700 cursor-pointer">
+                    Allow members to deposit any amount (disable fixed contribution)
+                  </label>
                 </div>
 
                 {/* Frequency */}
@@ -986,7 +1009,7 @@ export default function CreateGroupForm() {
                     <dl className="space-y-2">
                       <div className="flex justify-between">
                         <dt className="font-light">Contribution:</dt>
-                        <dd className="font-semibold text-[#001C3D]">ZMW {formData.chilimbaContributionAmount}</dd>
+                        <dd className="font-semibold text-[#001C3D]">{formData.chilimbaIsFlexibleContribution ? "Flexible (Any Amount)" : `ZMW ${formData.chilimbaContributionAmount}`}</dd>
                       </div>
                       <div className="flex justify-between">
                         <dt className="font-light">Frequency:</dt>

@@ -38,6 +38,8 @@ interface GroupContext {
   nextPayoutDate?: string;
   payoutRecipient?: string;
   shares?: number;
+  contributionAmount?: number;
+  isFlexibleContribution?: boolean;
 }
 
 interface PersonalTransaction {
@@ -170,7 +172,9 @@ export default function MemberDashboardView() {
           payoutRecipient: cycleSettings.payoutRecipient || m.name,
           shares: m.groups?.type === "agricultural"
             ? Math.floor(Number(summary?.total_contributions || 0) / (cycleSettings.sharePrice || 150))
-            : undefined
+            : undefined,
+          contributionAmount: cycleSettings.contributionAmount !== undefined ? Number(cycleSettings.contributionAmount) : 150,
+          isFlexibleContribution: !!cycleSettings.isFlexibleContribution
         };
       });
       setGroups(compiledGroups);
@@ -295,10 +299,18 @@ export default function MemberDashboardView() {
 
   // Adjust default pay type based on group details
   useEffect(() => {
-    if (activeGroup && activeGroup.outstandingLoan > 0) {
-      setPayType("repayment");
-    } else {
-      setPayType("contribution");
+    if (activeGroup) {
+      if (activeGroup.outstandingLoan > 0) {
+        setPayType("repayment");
+        setPayAmount(String(activeGroup.outstandingLoan));
+      } else {
+        setPayType("contribution");
+        setPayAmount(
+          activeGroup.type === "savings" && !activeGroup.isFlexibleContribution
+            ? String(activeGroup.contributionAmount || "150")
+            : "150"
+        );
+      }
     }
     setPayError("");
     setPaymentState("idle");
@@ -814,7 +826,7 @@ export default function MemberDashboardView() {
                     </div>
                     {activeGroup.outstandingLoan > 0 ? (
                       <button
-                        onClick={() => { setPayType("repayment"); setActiveTab("pay"); }}
+                        onClick={() => { setPayType("repayment"); setPayAmount(String(activeGroup.outstandingLoan || "150")); setActiveTab("pay"); }}
                         className="text-xs text-orange-600 hover:underline font-bold text-left mt-2"
                       >
                         Repay loan balance →
@@ -955,7 +967,15 @@ export default function MemberDashboardView() {
                       <div className="grid grid-cols-2 gap-3">
                         <button
                           type="button"
-                          onClick={() => { setPayType("contribution"); setPayError(""); }}
+                          onClick={() => { 
+                            setPayType("contribution"); 
+                            setPayError(""); 
+                            setPayAmount(
+                              activeGroup.type === "savings" && !activeGroup.isFlexibleContribution
+                                ? String(activeGroup.contributionAmount || "150")
+                                : "150"
+                            );
+                          }}
                           className={`py-2.5 text-center text-xs font-bold rounded-xl border transition-all ${
                             payType === "contribution" 
                               ? "bg-[#0070BA] text-white border-[#0070BA]" 
@@ -966,7 +986,11 @@ export default function MemberDashboardView() {
                         </button>
                         <button
                           type="button"
-                          onClick={() => { setPayType("repayment"); setPayError(""); }}
+                          onClick={() => { 
+                            setPayType("repayment"); 
+                            setPayError(""); 
+                            setPayAmount(String(activeGroup.outstandingLoan || "150"));
+                          }}
                           className={`py-2.5 text-center text-xs font-bold rounded-xl border transition-all ${
                             payType === "repayment" 
                               ? "bg-[#0070BA] text-white border-[#0070BA]" 
@@ -988,9 +1012,10 @@ export default function MemberDashboardView() {
                         type="number"
                         id="pay-amt-inp"
                         value={payAmount}
+                        disabled={activeGroup.type === "savings" && payType === "contribution" && !activeGroup.isFlexibleContribution}
                         onChange={(e) => setPayAmount(e.target.value)}
-                        placeholder="150"
-                        className="w-full border border-[#EBEBEB] rounded-xl pl-12 pr-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0070BA]"
+                        placeholder={activeGroup.type === "savings" && activeGroup.isFlexibleContribution ? "Enter any amount" : String(activeGroup.contributionAmount || "150")}
+                        className="w-full border border-[#EBEBEB] rounded-xl pl-12 pr-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0070BA] disabled:bg-slate-50 disabled:text-slate-500"
                       />
                     </div>
                   </div>

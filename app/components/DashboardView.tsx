@@ -159,6 +159,26 @@ export default function DashboardView() {
   const [isProposing, setIsProposing] = useState(false);
   const [copiedInvite, setCopiedInvite] = useState(false);
 
+  // Group cycle settings edit state
+  const [isEditingCycleSettings, setIsEditingCycleSettings] = useState(false);
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
+  const [editLocation, setEditLocation] = useState("");
+  const [editWalletProvider, setEditWalletProvider] = useState<"mtn" | "airtel">("mtn");
+  const [editWalletNum, setEditWalletNum] = useState("");
+  const [editWalletHolderName, setEditWalletHolderName] = useState("");
+  const [editContributionAmount, setEditContributionAmount] = useState("");
+  const [editFrequency, setEditFrequency] = useState("");
+  const [editRotationMethod, setEditRotationMethod] = useState("");
+  const [editSharePrice, setEditSharePrice] = useState("");
+  const [editMaxShares, setEditMaxShares] = useState("");
+  const [editDividendCycle, setEditDividendCycle] = useState("");
+  const [editMinBalanceToBorrow, setEditMinBalanceToBorrow] = useState("");
+  const [editInterestRate, setEditInterestRate] = useState("");
+  const [editLoanTermMonths, setEditLoanTermMonths] = useState("");
+  const [settingsError, setSettingsError] = useState("");
+  const [settingsSuccess, setSettingsSuccess] = useState("");
+  const [editIsFlexibleContribution, setEditIsFlexibleContribution] = useState(false);
+
   const loadDashboardData = async (groupId: string) => {
     try {
       const supabase = getSupabaseClient();
@@ -208,7 +228,7 @@ export default function DashboardView() {
       // Calculate dynamic target goal
       const settings = currentGroup?.cycle_settings || {};
       let calculatedGoal = Number(settings.targetGoal || 6000);
-      if (currentGroup?.type === "savings" && settings.contributionAmount) {
+      if (currentGroup?.type === "savings" && settings.contributionAmount && !settings.isFlexibleContribution) {
         const membersCount = mappedMembers.length || 1;
         calculatedGoal = Number(settings.contributionAmount) * membersCount;
       } else if (currentGroup?.type === "agricultural" && settings.sharePrice && settings.maxShares) {
@@ -740,6 +760,79 @@ export default function DashboardView() {
     setTimeout(() => {
       setCopiedInvite(false);
     }, 2000);
+  };
+
+  const handleStartEditingSettings = () => {
+    setSettingsError("");
+    setSettingsSuccess("");
+    setEditLocation(locationName);
+    setEditWalletProvider(walletProvider);
+    setEditWalletNum(walletNum);
+    setEditWalletHolderName(cycleSettings.walletHolderName || "");
+    setEditContributionAmount(String(cycleSettings.contributionAmount || "150"));
+    setEditFrequency(cycleSettings.frequency || "anytime");
+    setEditRotationMethod(cycleSettings.rotationMethod || "manual");
+    setEditIsFlexibleContribution(!!cycleSettings.isFlexibleContribution);
+    setEditSharePrice(String(cycleSettings.sharePrice || "150"));
+    setEditMaxShares(String(cycleSettings.maxShares || "10"));
+    setEditDividendCycle(cycleSettings.dividendCycle || "seasonal");
+    setEditMinBalanceToBorrow(String(cycleSettings.minBalanceToBorrow || "500"));
+    setEditInterestRate(String(cycleSettings.interestRate || "5"));
+    setEditLoanTermMonths(String(cycleSettings.loanTermMonths || "3"));
+    setIsEditingCycleSettings(true);
+  };
+
+  const handleSaveSettings = async () => {
+    setSettingsError("");
+    setSettingsSuccess("");
+    setIsSavingSettings(true);
+
+    try {
+      const supabase = getSupabaseClient();
+      
+      const updatedCycleSettings = {
+        ...cycleSettings,
+        walletProvider: editWalletProvider,
+        walletNumber: editWalletNum.trim(),
+        walletHolderName: editWalletHolderName.trim()
+      };
+
+      if (groupType === "savings") {
+        updatedCycleSettings.contributionAmount = editIsFlexibleContribution ? 0 : (Number(editContributionAmount) || 150);
+        updatedCycleSettings.frequency = editFrequency;
+        updatedCycleSettings.rotationMethod = editRotationMethod;
+        updatedCycleSettings.isFlexibleContribution = editIsFlexibleContribution;
+      } else if (groupType === "agricultural") {
+        updatedCycleSettings.sharePrice = Number(editSharePrice) || 150;
+        updatedCycleSettings.maxShares = Number(editMaxShares) || 10;
+        updatedCycleSettings.dividendCycle = editDividendCycle;
+      } else if (groupType === "sacco") {
+        updatedCycleSettings.minBalanceToBorrow = Number(editMinBalanceToBorrow) || 500;
+        updatedCycleSettings.interestRate = Number(editInterestRate) || 5;
+        updatedCycleSettings.loanTermMonths = Number(editLoanTermMonths) || 3;
+      }
+
+      const { error: updateErr } = await supabase
+        .from("groups")
+        .update({
+          location: editLocation.trim(),
+          cycle_settings: updatedCycleSettings
+        })
+        .eq("id", groupRef);
+
+      if (updateErr) {
+        setSettingsError("Failed to update specifications: " + updateErr.message);
+        return;
+      }
+
+      setSettingsSuccess("Specifications updated successfully!");
+      setIsEditingCycleSettings(false);
+      await loadDashboardData(groupRef);
+    } catch (err: any) {
+      setSettingsError("An error occurred: " + err.message);
+    } finally {
+      setIsSavingSettings(false);
+    }
   };
 
   const handlePrint = () => {
@@ -1821,46 +1914,276 @@ export default function DashboardView() {
 
               {activeTab === "cycle" && (
                 <div className="bg-white border border-[#EBEBEB] rounded-[20px] p-6 shadow-xs space-y-6 animate-fade-in">
-                  <div>
+                  <div className="flex justify-between items-center border-b border-[#EBEBEB] pb-4">
                     <h3 className="text-sm font-bold text-[#001C3D] uppercase tracking-wider">Active Group Cycle Specifications</h3>
+                    {!isEditingCycleSettings ? (
+                      userRole === "Group Treasurer" && (
+                        <button
+                          onClick={handleStartEditingSettings}
+                          className="px-4 py-1.5 border border-[#EBEBEB] hover:bg-slate-50 text-xs font-bold text-[#0070BA] rounded-full cursor-pointer transition-colors"
+                        >
+                          Edit Specifications
+                        </button>
+                      )
+                    ) : (
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setIsEditingCycleSettings(false)}
+                          className="px-4 py-1.5 border border-[#EBEBEB] hover:bg-slate-50 text-xs font-bold text-slate-500 rounded-full cursor-pointer transition-colors"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={handleSaveSettings}
+                          disabled={isSavingSettings}
+                          className="px-4 py-1.5 bg-[#0070BA] hover:bg-[#005EA6] text-xs font-bold text-white rounded-full cursor-pointer transition-colors disabled:opacity-50"
+                        >
+                          {isSavingSettings ? "Saving..." : "Save Specifications"}
+                        </button>
+                      </div>
+                    )}
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs text-[#545658]">
-                    <div className="space-y-2">
-                      <p className="font-bold text-[#001C3D] border-b border-[#EBEBEB] pb-1.5">Group Information</p>
-                      <p>Structure: <span className="capitalize font-semibold">{groupType} Circle</span></p>
-                      <p>City Node: {locationName}, Zambia</p>
-                      <p>System Token ID: <span className="font-mono">{groupRef}</span></p>
+
+                  {settingsError && (
+                    <div className="bg-red-50 text-red-600 text-xs p-3.5 rounded-xl border border-red-100 font-semibold flex items-center gap-2">
+                      <AlertCircle className="h-4 w-4 shrink-0" />
+                      <span>{settingsError}</span>
                     </div>
-                    <div className="space-y-2">
-                      <p className="font-bold text-[#001C3D] border-b border-[#EBEBEB] pb-1.5">Connected Wallet Node</p>
-                      <p>MoMo Gateway: <span className="uppercase font-semibold">{walletProvider}</span></p>
-                      <p>Collection Target Number: <span className="font-mono">{walletNum}</span></p>
-                      {cycleSettings.walletHolderName && <p>Registered Holder: {cycleSettings.walletHolderName}</p>}
+                  )}
+
+                  {settingsSuccess && (
+                    <div className="bg-green-50 text-green-700 text-xs p-3.5 rounded-xl border border-green-100 font-semibold flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4 shrink-0" />
+                      <span>{settingsSuccess}</span>
                     </div>
-                    <div className="space-y-2 md:col-span-2">
-                      <p className="font-bold text-[#001C3D] border-b border-[#EBEBEB] pb-1.5">Active Cycle Rules</p>
-                      {groupType === "savings" && (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          <p>Contribution Amount: <span className="font-semibold text-[#001C3D]">ZMW {cycleSettings.contributionAmount || 0}</span></p>
-                          <p>Frequency: <span className="capitalize font-semibold">{cycleSettings.frequency || "weekly"}</span></p>
-                          <p>Rotation Method: <span className="capitalize font-semibold">{cycleSettings.rotationMethod || "random"}</span></p>
+                  )}
+
+                  {isEditingCycleSettings ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs text-[#545658] animate-fade-in">
+                      {/* Left Column: Group Info */}
+                      <div className="space-y-4">
+                        <p className="font-bold text-[#001C3D] border-b border-[#EBEBEB] pb-1.5">Group Information</p>
+                        <div className="flex flex-col gap-1.5">
+                          <span className="font-semibold text-slate-500">Structure</span>
+                          <span className="capitalize font-bold text-[#001C3D]">{groupType} Circle</span>
                         </div>
-                      )}
-                      {groupType === "agricultural" && (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          <p>Share Price: <span className="font-semibold text-[#001C3D]">ZMW {cycleSettings.sharePrice || 0}</span></p>
-                          <p>Maximum Shares Limit: <span className="font-semibold text-[#001C3D]">{cycleSettings.maxShares || 0} Shares</span></p>
-                          <p>Dividend Payout Cycle: <span className="capitalize font-semibold">{cycleSettings.dividendCycle || "seasonal"}</span></p>
+                        <div className="flex flex-col gap-1.5">
+                          <label htmlFor="edit-location" className="font-semibold text-slate-500">City Node</label>
+                          <input
+                            type="text"
+                            id="edit-location"
+                            value={editLocation}
+                            onChange={(e) => setEditLocation(e.target.value)}
+                            className="border border-[#EBEBEB] rounded-lg p-2.5 focus:outline-none focus:ring-1 focus:ring-[#0070BA] bg-white text-xs w-full font-medium"
+                          />
                         </div>
-                      )}
-                      {groupType === "sacco" && (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          <p>Minimum Balance to Borrow: <span className="font-semibold text-[#001C3D]">ZMW {cycleSettings.minBalanceToBorrow || 0}</span></p>
-                          <p>Simple Interest Rate: <span className="font-semibold text-[#001C3D]">{cycleSettings.interestRate || 5}% monthly</span></p>
-                          <p>Loan Repayment Term: <span className="font-semibold text-[#001C3D]">{cycleSettings.loanTermMonths || 3} Months</span></p>
+                      </div>
+
+                      {/* Right Column: Wallet Info */}
+                      <div className="space-y-4">
+                        <p className="font-bold text-[#001C3D] border-b border-[#EBEBEB] pb-1.5">Connected Wallet Node</p>
+                        <div className="flex flex-col gap-1.5">
+                          <label htmlFor="edit-wallet-provider" className="font-semibold text-slate-500">MoMo Gateway</label>
+                          <select
+                            id="edit-wallet-provider"
+                            value={editWalletProvider}
+                            onChange={(e) => setEditWalletProvider(e.target.value as any)}
+                            className="border border-[#EBEBEB] rounded-lg p-2.5 focus:outline-none focus:ring-1 focus:ring-[#0070BA] bg-white text-xs w-full font-medium"
+                          >
+                            <option value="mtn">MTN MoMo</option>
+                            <option value="airtel">Airtel Money</option>
+                          </select>
                         </div>
-                      )}
+                        <div className="flex flex-col gap-1.5">
+                          <label htmlFor="edit-wallet-num" className="font-semibold text-slate-500">Collection Target Number</label>
+                          <input
+                            type="text"
+                            id="edit-wallet-num"
+                            value={editWalletNum}
+                            onChange={(e) => setEditWalletNum(e.target.value)}
+                            className="border border-[#EBEBEB] rounded-lg p-2.5 focus:outline-none focus:ring-1 focus:ring-[#0070BA] bg-white text-xs w-full font-medium"
+                          />
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                          <label htmlFor="edit-wallet-holder" className="font-semibold text-slate-500">Registered Holder</label>
+                          <input
+                            type="text"
+                            id="edit-wallet-holder"
+                            value={editWalletHolderName}
+                            onChange={(e) => setEditWalletHolderName(e.target.value)}
+                            className="border border-[#EBEBEB] rounded-lg p-2.5 focus:outline-none focus:ring-1 focus:ring-[#0070BA] bg-white text-xs w-full font-medium"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Bottom Span: Cycle Rules */}
+                      <div className="space-y-4 md:col-span-2 border-t border-[#EBEBEB] pt-4">
+                        <p className="font-bold text-[#001C3D] border-b border-[#EBEBEB] pb-1.5">Active Cycle Rules</p>
+                        
+                        {groupType === "savings" && (
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div className="flex flex-col gap-1.5">
+                              <label htmlFor="edit-contrib-amount" className="font-semibold text-slate-500">Contribution Amount (ZMW)</label>
+                              <input
+                                type="number"
+                                id="edit-contrib-amount"
+                                value={editIsFlexibleContribution ? "" : editContributionAmount}
+                                disabled={editIsFlexibleContribution}
+                                onChange={(e) => setEditContributionAmount(e.target.value)}
+                                placeholder={editIsFlexibleContribution ? "Flexible (Any Amount)" : "150"}
+                                className="border border-[#EBEBEB] rounded-lg p-2.5 focus:outline-none focus:ring-1 focus:ring-[#0070BA] bg-white text-xs font-medium disabled:bg-slate-50 disabled:text-slate-400"
+                              />
+                            </div>
+                            <div className="flex flex-col gap-1.5">
+                              <label htmlFor="edit-frequency" className="font-semibold text-slate-500">Frequency</label>
+                              <input
+                                type="text"
+                                id="edit-frequency"
+                                value={editFrequency}
+                                onChange={(e) => setEditFrequency(e.target.value)}
+                                placeholder="e.g. Anytime, weekly, monthly"
+                                className="border border-[#EBEBEB] rounded-lg p-2.5 focus:outline-none focus:ring-1 focus:ring-[#0070BA] bg-white text-xs font-medium"
+                              />
+                            </div>
+                            <div className="flex flex-col gap-1.5">
+                              <label htmlFor="edit-rotation" className="font-semibold text-slate-500">Rotation Method</label>
+                              <input
+                                type="text"
+                                id="edit-rotation"
+                                value={editRotationMethod}
+                                onChange={(e) => setEditRotationMethod(e.target.value)}
+                                placeholder="e.g. Manual, random, fixed"
+                                className="border border-[#EBEBEB] rounded-lg p-2.5 focus:outline-none focus:ring-1 focus:ring-[#0070BA] bg-white text-xs font-medium"
+                              />
+                            </div>
+
+                            <div className="flex items-center gap-2 sm:col-span-3 pt-2">
+                              <input
+                                type="checkbox"
+                                id="edit-flexible-contrib"
+                                checked={editIsFlexibleContribution}
+                                onChange={(e) => setEditIsFlexibleContribution(e.target.checked)}
+                                className="h-4 w-4 rounded border-gray-300 text-[#0070BA] focus:ring-[#0070BA] cursor-pointer"
+                              />
+                              <label htmlFor="edit-flexible-contrib" className="text-xs font-bold text-slate-700 cursor-pointer">
+                                Allow members to deposit any amount (disable fixed contribution)
+                              </label>
+                            </div>
+                          </div>
+                        )}
+
+                        {groupType === "agricultural" && (
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div className="flex flex-col gap-1.5">
+                              <label htmlFor="edit-share-price" className="font-semibold text-slate-500">Share Price (ZMW)</label>
+                              <input
+                                type="number"
+                                id="edit-share-price"
+                                value={editSharePrice}
+                                onChange={(e) => setEditSharePrice(e.target.value)}
+                                className="border border-[#EBEBEB] rounded-lg p-2.5 focus:outline-none focus:ring-1 focus:ring-[#0070BA] bg-white text-xs font-medium"
+                              />
+                            </div>
+                            <div className="flex flex-col gap-1.5">
+                              <label htmlFor="edit-max-shares" className="font-semibold text-slate-500">Maximum Shares Limit</label>
+                              <input
+                                type="number"
+                                id="edit-max-shares"
+                                value={editMaxShares}
+                                onChange={(e) => setEditMaxShares(e.target.value)}
+                                className="border border-[#EBEBEB] rounded-lg p-2.5 focus:outline-none focus:ring-1 focus:ring-[#0070BA] bg-white text-xs font-medium"
+                              />
+                            </div>
+                            <div className="flex flex-col gap-1.5">
+                              <label htmlFor="edit-div-cycle" className="font-semibold text-slate-500">Dividend Payout Cycle</label>
+                              <input
+                                type="text"
+                                id="edit-div-cycle"
+                                value={editDividendCycle}
+                                onChange={(e) => setEditDividendCycle(e.target.value)}
+                                placeholder="e.g. Seasonal, annual"
+                                className="border border-[#EBEBEB] rounded-lg p-2.5 focus:outline-none focus:ring-1 focus:ring-[#0070BA] bg-white text-xs font-medium"
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        {groupType === "sacco" && (
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div className="flex flex-col gap-1.5">
+                              <label htmlFor="edit-min-borrow" className="font-semibold text-slate-500">Minimum Balance to Borrow (ZMW)</label>
+                              <input
+                                type="number"
+                                id="edit-min-borrow"
+                                value={editMinBalanceToBorrow}
+                                onChange={(e) => setEditMinBalanceToBorrow(e.target.value)}
+                                className="border border-[#EBEBEB] rounded-lg p-2.5 focus:outline-none focus:ring-1 focus:ring-[#0070BA] bg-white text-xs font-medium"
+                              />
+                            </div>
+                            <div className="flex flex-col gap-1.5">
+                              <label htmlFor="edit-interest" className="font-semibold text-slate-500">Simple Interest Rate (%)</label>
+                              <input
+                                type="number"
+                                id="edit-interest"
+                                value={editInterestRate}
+                                onChange={(e) => setEditInterestRate(e.target.value)}
+                                className="border border-[#EBEBEB] rounded-lg p-2.5 focus:outline-none focus:ring-1 focus:ring-[#0070BA] bg-white text-xs font-medium"
+                              />
+                            </div>
+                            <div className="flex flex-col gap-1.5">
+                              <label htmlFor="edit-term" className="font-semibold text-slate-500">Loan Repayment Term (Months)</label>
+                              <input
+                                type="number"
+                                id="edit-term"
+                                value={editLoanTermMonths}
+                                onChange={(e) => setEditLoanTermMonths(e.target.value)}
+                                className="border border-[#EBEBEB] rounded-lg p-2.5 focus:outline-none focus:ring-1 focus:ring-[#0070BA] bg-white text-xs font-medium"
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs text-[#545658] animate-fade-in">
+                      <div className="space-y-2">
+                        <p className="font-bold text-[#001C3D] border-b border-[#EBEBEB] pb-1.5">Group Information</p>
+                        <p>Structure: <span className="capitalize font-semibold">{groupType} Circle</span></p>
+                        <p>City Node: {locationName}, Zambia</p>
+                        <p>System Token ID: <span className="font-mono">{groupRef}</span></p>
+                      </div>
+                      <div className="space-y-2">
+                        <p className="font-bold text-[#001C3D] border-b border-[#EBEBEB] pb-1.5">Connected Wallet Node</p>
+                        <p>MoMo Gateway: <span className="uppercase font-semibold">{walletProvider}</span></p>
+                        <p>Collection Target Number: <span className="font-mono">{walletNum}</span></p>
+                        {cycleSettings.walletHolderName && <p>Registered Holder: {cycleSettings.walletHolderName}</p>}
+                      </div>
+                      <div className="space-y-2 md:col-span-2">
+                        <p className="font-bold text-[#001C3D] border-b border-[#EBEBEB] pb-1.5">Active Cycle Rules</p>
+                        {groupType === "savings" && (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <p>Contribution Amount: <span className="font-semibold text-[#001C3D]">{cycleSettings.isFlexibleContribution ? "Flexible (Any Amount)" : `ZMW ${cycleSettings.contributionAmount || 0}`}</span></p>
+                            <p>Frequency: <span className="capitalize font-semibold">{cycleSettings.frequency || "weekly"}</span></p>
+                            <p>Rotation Method: <span className="capitalize font-semibold">{cycleSettings.rotationMethod || "random"}</span></p>
+                          </div>
+                        )}
+                        {groupType === "agricultural" && (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <p>Share Price: <span className="font-semibold text-[#001C3D]">ZMW {cycleSettings.sharePrice || 0}</span></p>
+                            <p>Maximum Shares Limit: <span className="font-semibold text-[#001C3D]">{cycleSettings.maxShares || 0} Shares</span></p>
+                            <p>Dividend Payout Cycle: <span className="capitalize font-semibold">{cycleSettings.dividendCycle || "seasonal"}</span></p>
+                          </div>
+                        )}
+                        {groupType === "sacco" && (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <p>Minimum Balance to Borrow: <span className="font-semibold text-[#001C3D]">ZMW {cycleSettings.minBalanceToBorrow || 0}</span></p>
+                            <p>Simple Interest Rate: <span className="font-semibold text-[#001C3D]">{cycleSettings.interestRate || 5}% monthly</span></p>
+                            <p>Loan Repayment Term: <span className="font-semibold text-[#001C3D]">{cycleSettings.loanTermMonths || 3} Months</span></p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
 
                     {/* Group Renaming Panel */}
                     <div className="space-y-3 md:col-span-2 border-t border-[#EBEBEB] pt-6 mt-2">
@@ -1932,7 +2255,6 @@ export default function DashboardView() {
                     </div>
 
                   </div>
-                </div>
               )}
             </>
           )}
