@@ -178,6 +178,7 @@ export default function DashboardView() {
   const [settingsError, setSettingsError] = useState("");
   const [settingsSuccess, setSettingsSuccess] = useState("");
   const [editIsFlexibleContribution, setEditIsFlexibleContribution] = useState(false);
+  const [editTargetGoal, setEditTargetGoal] = useState("");
 
   const loadDashboardData = async (groupId: string) => {
     try {
@@ -228,12 +229,20 @@ export default function DashboardView() {
       // Calculate dynamic target goal
       const settings = currentGroup?.cycle_settings || {};
       let calculatedGoal = Number(settings.targetGoal || 6000);
-      if (currentGroup?.type === "savings" && settings.contributionAmount && !settings.isFlexibleContribution) {
-        const membersCount = mappedMembers.length || 1;
-        calculatedGoal = Number(settings.contributionAmount) * membersCount;
-      } else if (currentGroup?.type === "agricultural" && settings.sharePrice && settings.maxShares) {
-        const membersCount = mappedMembers.length || 1;
-        calculatedGoal = Number(settings.sharePrice) * Number(settings.maxShares) * membersCount;
+      if (currentGroup?.type === "savings") {
+        if (settings.targetGoal !== undefined && settings.targetGoal !== null) {
+          calculatedGoal = Number(settings.targetGoal);
+        } else if (settings.contributionAmount && !settings.isFlexibleContribution) {
+          const membersCount = mappedMembers.length || 1;
+          calculatedGoal = Number(settings.contributionAmount) * membersCount;
+        }
+      } else if (currentGroup?.type === "agricultural") {
+        if (settings.targetGoal !== undefined && settings.targetGoal !== null) {
+          calculatedGoal = Number(settings.targetGoal);
+        } else if (settings.sharePrice && settings.maxShares) {
+          const membersCount = mappedMembers.length || 1;
+          calculatedGoal = Number(settings.sharePrice) * Number(settings.maxShares) * membersCount;
+        }
       }
       setGroupTargetGoal(calculatedGoal);
 
@@ -773,6 +782,7 @@ export default function DashboardView() {
     setEditFrequency(cycleSettings.frequency || "anytime");
     setEditRotationMethod(cycleSettings.rotationMethod || "manual");
     setEditIsFlexibleContribution(!!cycleSettings.isFlexibleContribution);
+    setEditTargetGoal(String(cycleSettings.targetGoal || "6000"));
     setEditSharePrice(String(cycleSettings.sharePrice || "150"));
     setEditMaxShares(String(cycleSettings.maxShares || "10"));
     setEditDividendCycle(cycleSettings.dividendCycle || "seasonal");
@@ -802,6 +812,7 @@ export default function DashboardView() {
         updatedCycleSettings.frequency = editFrequency;
         updatedCycleSettings.rotationMethod = editRotationMethod;
         updatedCycleSettings.isFlexibleContribution = editIsFlexibleContribution;
+        updatedCycleSettings.targetGoal = Number(editTargetGoal) || 6000;
       } else if (groupType === "agricultural") {
         updatedCycleSettings.sharePrice = Number(editSharePrice) || 150;
         updatedCycleSettings.maxShares = Number(editMaxShares) || 10;
@@ -2021,7 +2032,7 @@ export default function DashboardView() {
                         <p className="font-bold text-[#001C3D] border-b border-[#EBEBEB] pb-1.5">Active Cycle Rules</p>
                         
                         {groupType === "savings" && (
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="flex flex-col gap-1.5">
                               <label htmlFor="edit-contrib-amount" className="font-semibold text-slate-500">Contribution Amount (ZMW)</label>
                               <input
@@ -2032,6 +2043,17 @@ export default function DashboardView() {
                                 onChange={(e) => setEditContributionAmount(e.target.value)}
                                 placeholder={editIsFlexibleContribution ? "Flexible (Any Amount)" : "150"}
                                 className="border border-[#EBEBEB] rounded-lg p-2.5 focus:outline-none focus:ring-1 focus:ring-[#0070BA] bg-white text-xs font-medium disabled:bg-slate-50 disabled:text-slate-400"
+                              />
+                            </div>
+                            <div className="flex flex-col gap-1.5">
+                              <label htmlFor="edit-target-goal" className="font-semibold text-slate-500">Target Savings Goal (ZMW)</label>
+                              <input
+                                type="number"
+                                id="edit-target-goal"
+                                value={editTargetGoal}
+                                onChange={(e) => setEditTargetGoal(e.target.value)}
+                                placeholder="6000"
+                                className="border border-[#EBEBEB] rounded-lg p-2.5 focus:outline-none focus:ring-1 focus:ring-[#0070BA] bg-white text-xs font-medium"
                               />
                             </div>
                             <div className="flex flex-col gap-1.5">
@@ -2057,7 +2079,7 @@ export default function DashboardView() {
                               />
                             </div>
 
-                            <div className="flex items-center gap-2 sm:col-span-3 pt-2">
+                            <div className="flex items-center gap-2 sm:col-span-2 pt-2">
                               <input
                                 type="checkbox"
                                 id="edit-flexible-contrib"
@@ -2163,6 +2185,7 @@ export default function DashboardView() {
                         {groupType === "savings" && (
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <p>Contribution Amount: <span className="font-semibold text-[#001C3D]">{cycleSettings.isFlexibleContribution ? "Flexible (Any Amount)" : `ZMW ${cycleSettings.contributionAmount || 0}`}</span></p>
+                            <p>Target Savings Goal: <span className="font-semibold text-[#001C3D]">ZMW {cycleSettings.targetGoal || 6000}</span></p>
                             <p>Frequency: <span className="capitalize font-semibold">{cycleSettings.frequency || "weekly"}</span></p>
                             <p>Rotation Method: <span className="capitalize font-semibold">{cycleSettings.rotationMethod || "random"}</span></p>
                           </div>

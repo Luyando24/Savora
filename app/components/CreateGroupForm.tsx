@@ -29,6 +29,7 @@ interface GroupFormData {
   chilimbaFrequency: "weekly" | "monthly" | "anytime";
   chilimbaRotationMethod: "random" | "ordered" | "manual";
   chilimbaIsFlexibleContribution: boolean;
+  chilimbaTargetGoal: string;
   
   // Co-op rules
   coopSharePrice: string;
@@ -61,6 +62,7 @@ const initialFormData: GroupFormData = {
   chilimbaFrequency: "weekly",
   chilimbaRotationMethod: "random",
   chilimbaIsFlexibleContribution: false,
+  chilimbaTargetGoal: "6000",
   
   coopSharePrice: "200",
   coopMaxShares: "100",
@@ -153,6 +155,10 @@ export default function CreateGroupForm() {
             newErrors.chilimbaContributionAmount = "Contribution amount must be a positive number.";
           }
         }
+        const target = parseFloat(formData.chilimbaTargetGoal);
+        if (isNaN(target) || target <= 0) {
+          newErrors.chilimbaTargetGoal = "Target savings goal must be a positive number.";
+        }
       } else if (formData.type === "agricultural") {
         const price = parseFloat(formData.coopSharePrice);
         const max = parseInt(formData.coopMaxShares);
@@ -242,7 +248,8 @@ export default function CreateGroupForm() {
           contributionAmount: formData.chilimbaIsFlexibleContribution ? 0 : (parseFloat(formData.chilimbaContributionAmount) || 0),
           frequency: formData.chilimbaFrequency,
           rotationMethod: formData.chilimbaRotationMethod,
-          isFlexibleContribution: formData.chilimbaIsFlexibleContribution
+          isFlexibleContribution: formData.chilimbaIsFlexibleContribution,
+          targetGoal: parseFloat(formData.chilimbaTargetGoal) || 6000
         } : formData.type === "agricultural" ? {
           sharePrice: parseFloat(formData.coopSharePrice) || 0,
           maxShares: parseInt(formData.coopMaxShares) || 0,
@@ -653,6 +660,27 @@ export default function CreateGroupForm() {
                   {errors.chilimbaContributionAmount && <span className="text-xs text-[#E11900] font-medium">{errors.chilimbaContributionAmount}</span>}
                 </div>
 
+                {/* Target savings goal */}
+                <div className="flex flex-col gap-2">
+                  <label htmlFor="chilimba-target-goal" className="text-sm font-bold text-[#001C3D]">
+                    Target Savings Goal (ZMW)
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-3.5 text-sm text-[#545658] font-semibold">ZMW</span>
+                    <input
+                      type="number"
+                      id="chilimba-target-goal"
+                      value={formData.chilimbaTargetGoal}
+                      onChange={(e) => updateField("chilimbaTargetGoal", e.target.value)}
+                      placeholder="6000"
+                      className={`w-full border rounded-lg p-3 pl-12 text-sm focus:outline-none focus:ring-1 focus:ring-[#0070BA] ${
+                        errors.chilimbaTargetGoal ? "border-[#E11900]" : "border-[#EBEBEB]"
+                      }`}
+                    />
+                  </div>
+                  {errors.chilimbaTargetGoal && <span className="text-xs text-[#E11900] font-medium">{errors.chilimbaTargetGoal}</span>}
+                </div>
+
                 <div className="flex items-center gap-2 md:col-span-2">
                   <input
                     type="checkbox"
@@ -1010,6 +1038,10 @@ export default function CreateGroupForm() {
                       <div className="flex justify-between">
                         <dt className="font-light">Contribution:</dt>
                         <dd className="font-semibold text-[#001C3D]">{formData.chilimbaIsFlexibleContribution ? "Flexible (Any Amount)" : `ZMW ${formData.chilimbaContributionAmount}`}</dd>
+                      </div>
+                      <div className="flex justify-between">
+                        <dt className="font-light">Target Goal:</dt>
+                        <dd className="font-semibold text-[#001C3D]">ZMW {formData.chilimbaTargetGoal}</dd>
                       </div>
                       <div className="flex justify-between">
                         <dt className="font-light">Frequency:</dt>
