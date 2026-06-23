@@ -32,7 +32,9 @@ import {
   Settings,
   ArrowLeft,
   MapPin,
-  Printer
+  Printer,
+  Clock,
+  Check
 } from "lucide-react";
 import { getSupabaseClient } from "@/app/lib/supabase";
 import MobileBottomNav from "./MobileBottomNav";
@@ -758,6 +760,26 @@ export default function DashboardView() {
       await loadDashboardData(groupRef);
     } catch (err: any) {
       setProposeError("An error occurred: " + err.message);
+    }
+  };
+
+  const handleConfirmTransaction = async (txId: string, newStatus: "completed" | "failed") => {
+    try {
+      const supabase = getSupabaseClient();
+      
+      const { error } = await supabase
+        .from("transactions")
+        .update({ status: newStatus })
+        .eq("id", txId);
+
+      if (error) {
+        alert("Failed to update transaction: " + error.message);
+        return;
+      }
+
+      await loadDashboardData(groupRef);
+    } catch (err: any) {
+      alert("Error confirming transaction: " + err.message);
     }
   };
 
@@ -1832,57 +1854,147 @@ export default function DashboardView() {
               )}
 
               {activeTab === "contributions" && (
-                <div className="bg-white border border-[#EBEBEB] rounded-[20px] overflow-hidden shadow-xs animate-fade-in">
-                  <div className="p-6 border-b border-[#EBEBEB] flex justify-between items-center bg-[#F5F7FA]">
-                    <div>
-                      <h3 className="text-sm font-bold text-[#001C3D] uppercase tracking-wider">MoMo Automated Webhook Confirmations</h3>
-                    </div>
-                    <button
-                      onClick={() => setIsAdjustmentModalOpen(true)}
-                      className="px-4 py-2 border border-[#EBEBEB] hover:bg-gray-50 text-xs font-bold text-[#001C3D] rounded-full"
-                    >
-                      Post Manual Adjustment
-                    </button>
-                  </div>
-
-                  <div className="divide-y divide-[#EBEBEB]">
-                    {transactions.map((tx) => (
-                      <div key={tx.id} className="p-4 hover:bg-[#F5F7FA]/30 flex flex-col sm:flex-row justify-between sm:items-center gap-4 transition-colors text-xs text-[#545658]">
-                        <div className="flex items-start gap-3">
-                          <div className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 ${
-                            tx.type === "contribution" || tx.type === "repayment" ? "bg-[#28A745]/15 text-[#28A745]" : "bg-orange-50 text-orange-600"
-                          }`}>
-                            {tx.type === "contribution" && <ArrowDownLeft className="h-4.5 w-4.5" />}
-                            {tx.type === "repayment" && <Coins className="h-4.5 w-4.5" />}
-                            {tx.type === "loan_disbursement" && <ArrowUpRight className="h-4.5 w-4.5" />}
-                            {tx.type === "adjustment" && <FileSpreadsheet className="h-4.5 w-4.5" />}
-                          </div>
+                <div className="space-y-6 animate-fade-in w-full">
+                  
+                  {/* PENDING MANUAL DEPOSITS APPROVAL SECTION */}
+                  {(() => {
+                    const pendingDeposits = transactions.filter(tx => tx.status === "pending");
+                    if (pendingDeposits.length === 0) return null;
+                    
+                    return (
+                      <div className="bg-white border border-[#EBEBEB] rounded-[20px] overflow-hidden shadow-md">
+                        <div className="p-6 border-b border-[#EBEBEB] bg-[#0070BA]/5 flex justify-between items-center">
                           <div>
-                            <p className="font-bold text-[#001C3D]">
-                              {tx.memberName} 
-                              <span className="font-light text-[#545658] text-xs ml-1">
-                                {tx.type === "contribution" && "deposited savings"}
-                                {tx.type === "repayment" && "paid loan repayment"}
-                                {tx.type === "loan_disbursement" && "disbursed loan"}
-                                {tx.type === "adjustment" && `posted ledger adjustment (${tx.notes})`}
-                              </span>
-                            </p>
-                            <div className="flex items-center gap-2 text-[10px] text-gray-400 mt-0.5">
-                              <span className="font-mono">{tx.referenceId}</span>
-                              <span>•</span>
-                              <span>{new Date(tx.date).toLocaleDateString()}</span>
-                              <span>•</span>
-                              <span className="capitalize">{tx.provider}</span>
-                            </div>
+                            <h3 className="text-sm font-black text-[#001C3D] uppercase tracking-wider flex items-center gap-2">
+                              <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+                              Pending Manual Deposits ({pendingDeposits.length})
+                            </h3>
+                            <p className="text-[11px] text-[#545658]/70 mt-0.5">Verify these transfers on your phone statement, then approve to update ledger</p>
                           </div>
                         </div>
-                        <div className="text-right">
-                          <span className={`font-bold font-display ${tx.type === "contribution" || tx.type === "repayment" ? "text-[#28A745]" : "text-[#001C3D]"}`}>
-                            {tx.type === "contribution" || tx.type === "repayment" ? "+" : "-"} ZMW {tx.amount.toLocaleString()}
-                          </span>
+
+                        <div className="divide-y divide-[#EBEBEB]">
+                          {pendingDeposits.map((tx) => (
+                            <div key={tx.id} className="p-4 hover:bg-[#F5F7FA]/30 flex flex-col sm:flex-row justify-between sm:items-center gap-4 transition-colors text-xs text-[#545658]">
+                              <div className="flex items-start gap-3">
+                                <div className="h-8 w-8 rounded-lg bg-amber-500/10 text-amber-600 flex items-center justify-center shrink-0">
+                                  <Clock className="h-4.5 w-4.5" />
+                                </div>
+                                <div>
+                                  <p className="font-bold text-[#001C3D]">
+                                    {tx.memberName} 
+                                    <span className="font-light text-[#545658] text-xs ml-1 font-sans">
+                                      {tx.type === "contribution" ? "deposited savings" : "paid loan repayment"}
+                                    </span>
+                                  </p>
+                                  <div className="flex items-center gap-2 text-[10px] text-gray-400 mt-0.5 font-medium">
+                                    <span className="bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded text-[9px] font-bold">SMS Ref: {tx.referenceId}</span>
+                                    <span>•</span>
+                                    <span>{new Date(tx.date).toLocaleDateString()}</span>
+                                    <span>•</span>
+                                    <span className="capitalize">{tx.provider}</span>
+                                  </div>
+                                </div>
+                              </div>
+                              
+                              <div className="flex items-center gap-3 justify-between sm:justify-end">
+                                <div className="text-right mr-2">
+                                  <span className="font-bold font-display text-amber-600">
+                                    + ZMW {tx.amount.toLocaleString()}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    onClick={() => handleConfirmTransaction(tx.id, "completed")}
+                                    className="px-3.5 py-1.5 bg-[#28A745] hover:bg-[#218838] text-white text-[11px] font-bold rounded-full transition-all active:scale-95 cursor-pointer shadow-xs"
+                                  >
+                                    Approve
+                                  </button>
+                                  <button
+                                    onClick={() => handleConfirmTransaction(tx.id, "failed")}
+                                    className="px-3.5 py-1.5 border border-red-200 hover:border-red-400 hover:bg-red-50 text-red-600 text-[11px] font-bold rounded-full transition-all active:scale-95 cursor-pointer"
+                                  >
+                                    Reject
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       </div>
-                    ))}
+                    );
+                  })()}
+
+                  {/* Standard ledger log */}
+                  <div className="bg-white border border-[#EBEBEB] rounded-[20px] overflow-hidden shadow-xs">
+                    <div className="p-6 border-b border-[#EBEBEB] flex justify-between items-center bg-[#F5F7FA]">
+                      <div>
+                        <h3 className="text-sm font-bold text-[#001C3D] uppercase tracking-wider">MoMo Ledger Transaction History</h3>
+                      </div>
+                      <button
+                        onClick={() => setIsAdjustmentModalOpen(true)}
+                        className="px-4 py-2 border border-[#EBEBEB] hover:bg-gray-50 text-xs font-bold text-[#001C3D] rounded-full cursor-pointer"
+                      >
+                        Post Manual Adjustment
+                      </button>
+                    </div>
+
+                    <div className="divide-y divide-[#EBEBEB]">
+                      {(() => {
+                        const completedOrFailed = transactions.filter(tx => tx.status !== "pending");
+                        if (completedOrFailed.length === 0) {
+                          return (
+                            <div className="p-8 text-center text-gray-400">
+                              No completed or rejected transactions recorded yet.
+                            </div>
+                          );
+                        }
+                        return completedOrFailed.map((tx) => (
+                          <div key={tx.id} className="p-4 hover:bg-[#F5F7FA]/30 flex flex-col sm:flex-row justify-between sm:items-center gap-4 transition-colors text-xs text-[#545658]">
+                            <div className="flex items-start gap-3">
+                              <div className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 ${
+                                tx.status === "failed" ? "bg-red-50 text-red-500" :
+                                tx.type === "contribution" || tx.type === "repayment" ? "bg-[#28A745]/15 text-[#28A745]" : "bg-orange-50 text-orange-600"
+                              }`}>
+                                {tx.type === "contribution" && <ArrowDownLeft className="h-4.5 w-4.5" />}
+                                {tx.type === "repayment" && <Coins className="h-4.5 w-4.5" />}
+                                {tx.type === "loan_disbursement" && <ArrowUpRight className="h-4.5 w-4.5" />}
+                                {tx.type === "adjustment" && <FileSpreadsheet className="h-4.5 w-4.5" />}
+                              </div>
+                              <div>
+                                <p className="font-bold text-[#001C3D]">
+                                  {tx.memberName} 
+                                  <span className="font-light text-[#545658] text-xs ml-1">
+                                    {tx.type === "contribution" && "deposited savings"}
+                                    {tx.type === "repayment" && "paid loan repayment"}
+                                    {tx.type === "loan_disbursement" && "disbursed loan"}
+                                    {tx.type === "adjustment" && `posted ledger adjustment (${tx.notes})`}
+                                  </span>
+                                </p>
+                                <div className="flex items-center gap-2 text-[10px] text-gray-400 mt-0.5">
+                                  <span className="font-mono">{tx.referenceId}</span>
+                                  <span>•</span>
+                                  <span>{new Date(tx.date).toLocaleDateString()}</span>
+                                  <span>•</span>
+                                  <span className="capitalize">{tx.provider}</span>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <span className={`font-bold font-display ${
+                                tx.status === "failed" ? "text-red-500 line-through" :
+                                tx.type === "contribution" || tx.type === "repayment" ? "text-[#28A745]" : "text-[#001C3D]"
+                              }`}>
+                                {tx.type === "contribution" || tx.type === "repayment" ? "+" : "-"} ZMW {tx.amount.toLocaleString()}
+                              </span>
+                              {tx.status === "failed" && (
+                                <p className="text-[9px] text-red-500 font-bold mt-0.5">Rejected</p>
+                              )}
+                            </div>
+                          </div>
+                        ));
+                      })()}
+                    </div>
                   </div>
                 </div>
               )}

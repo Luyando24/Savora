@@ -40,6 +40,9 @@ interface GroupContext {
   shares?: number;
   contributionAmount?: number;
   isFlexibleContribution?: boolean;
+  walletNumber?: string;
+  walletProvider?: string;
+  walletHolderName?: string;
 }
 
 interface PersonalTransaction {
@@ -84,7 +87,17 @@ export default function MemberDashboardView() {
   ]);
 
   const [activeGroupIndex, setActiveGroupIndex] = useState(0);
-  const activeGroup = groups[activeGroupIndex] || { id: "empty", name: "No Active Circle", type: "savings", balance: 0, outstandingLoan: 0, targetGoal: 6000 };
+  const activeGroup = groups[activeGroupIndex] || { 
+    id: "empty", 
+    name: "No Active Circle", 
+    type: "savings", 
+    balance: 0, 
+    outstandingLoan: 0, 
+    targetGoal: 6000,
+    walletNumber: "",
+    walletProvider: "mtn",
+    walletHolderName: ""
+  };
 
   // Transaction Log State
   const [transactions, setTransactions] = useState<Record<string, PersonalTransaction[]>>({});
@@ -104,6 +117,7 @@ export default function MemberDashboardView() {
   const [enteredPin, setEnteredPin] = useState("");
   const [payError, setPayError] = useState("");
   const [simulatedTxRef, setSimulatedTxRef] = useState("");
+  const [payReferenceId, setPayReferenceId] = useState("");
   const [payType, setPayType] = useState<"contribution" | "repayment">("contribution");
 
   const loadMemberData = async (email: string, activeIndex: number = 0) => {
@@ -174,7 +188,10 @@ export default function MemberDashboardView() {
             ? Math.floor(Number(summary?.total_contributions || 0) / (cycleSettings.sharePrice || 150))
             : undefined,
           contributionAmount: cycleSettings.contributionAmount !== undefined ? Number(cycleSettings.contributionAmount) : 150,
-          isFlexibleContribution: !!cycleSettings.isFlexibleContribution
+          isFlexibleContribution: !!cycleSettings.isFlexibleContribution,
+          walletNumber: cycleSettings.walletNumber || "",
+          walletProvider: cycleSettings.walletProvider || "mtn",
+          walletHolderName: cycleSettings.walletHolderName || ""
         };
       });
       setGroups(compiledGroups);
@@ -409,15 +426,18 @@ export default function MemberDashboardView() {
       setPayError(`Payment cannot exceed your outstanding loan of ZMW ${activeGroup.outstandingLoan}.`);
       return;
     }
+    if (!payReferenceId.trim()) {
+      setPayError("Please enter the Mobile Money Transaction Reference ID.");
+      return;
+    }
     
     setPayError("");
     setPaymentState("requesting");
-    setEnteredPin("");
 
     try {
       const supabase = getSupabaseClient();
       
-      // 1. Insert pending transaction in Supabase
+      // 1. Insert pending manual transaction in Supabase
       const { data: newTx, error: txErr } = await supabase
         .from("transactions")
         .insert({
@@ -426,46 +446,22 @@ export default function MemberDashboardView() {
           type: payType,
           amount: amt,
           provider: payProvider,
+          provider_reference_id: payReferenceId.trim(),
           status: "pending"
         })
         .select()
         .single();
 
       if (txErr) {
-        setPayError("Failed to initiate transaction: " + txErr.message);
+        setPayError("Failed to record manual deposit: " + txErr.message);
         setPaymentState("idle");
         return;
       }
 
-      setSimulatedTxRef(newTx.id);
-      
-      // Set up realtime watcher for this specific transaction ID
-      const channel = supabase
-        .channel(`tx-watch-${newTx.id}`)
-        .on(
-          "postgres_changes",
-          {
-            event: "UPDATE",
-            schema: "public",
-            table: "transactions",
-            filter: `id=eq.${newTx.id}`
-          },
-          (payload: any) => {
-            console.log("Realtime transaction update detected in watch:", payload);
-            if (payload.new.status === "completed") {
-              setPaymentState("success");
-              loadMemberData("", activeGroupIndex);
-              channel.unsubscribe();
-            } else if (payload.new.status === "failed") {
-              setPaymentState("failed");
-              channel.unsubscribe();
-            }
-          }
-        )
-        .subscribe();
-
-      // Proceed to PIN entry screen
-      setPaymentState("pin_entry");
+      setSimulatedTxRef(newTx.provider_reference_id || newTx.id);
+      setPayReferenceId(""); // Clear input field
+      setPaymentState("success");
+      await loadMemberData("", activeGroupIndex);
 
     } catch (err: any) {
       setPayError("Network connection error: " + err.message);
@@ -948,8 +944,22 @@ export default function MemberDashboardView() {
               {/* Payment trigger Card */}
               <div className="bg-white border border-[#EBEBEB] rounded-2xl p-6 shadow-xs space-y-4">
                 <div>
-                  <h3 className="text-base font-bold text-[#001C3D]">Initiate Mobile Money Deposit</h3>
-                  <p className="text-xs text-[#545658]/70 font-light mt-1">This will trigger an MNO Request-to-Pay webhook prompt to your phone.</p>
+                  <h3 className="text-base font-bold text-[#001C3D]">Record Manual Deposit</h3>
+                  <p className="text-xs text-[#545658]/70 font-light mt-1">
+                    Transfer money directly to the treasurer's wallet, then record your Transaction Reference ID below.
+                  </p>
+                </div>
+
+                {/* Treasurer Wallet Info */}
+                <div className="bg-[#F5F7FA] border border-[#EBEBEB] rounded-xl p-4 space-y-2 text-xs">
+                  <p className="text-[10px] font-bold text-[#545658] uppercase tracking-wider">Treasurer Wallet for Transfer</p>
+                  <div className="grid grid-cols-2 gap-2 text-[#001C3D] font-semibold">
+                    <p>Provider: <span className="uppercase text-[#0070BA]">{activeGroup.walletProvider || "MTN"}</span></p>
+                    <p>Number: <span className="font-mono text-[#0070BA]">{activeGroup.walletNumber || "0977123456"}</span></p>
+                    {activeGroup.walletHolderName && (
+                      <p className="col-span-2">Registered Name: <span className="text-[#0070BA]">{activeGroup.walletHolderName}</span></p>
+                    )}
+                  </div>
                 </div>
 
                 {payError && (
@@ -1051,145 +1061,62 @@ export default function MemberDashboardView() {
                     </div>
                   </div>
 
+                  {/* Transaction Reference ID */}
+                  <div className="flex flex-col gap-1.5">
+                    <label htmlFor="pay-ref-inp" className="text-xs font-bold text-[#545658]">Transaction Reference ID</label>
+                    <input
+                      type="text"
+                      id="pay-ref-inp"
+                      required
+                      value={payReferenceId}
+                      onChange={(e) => setPayReferenceId(e.target.value)}
+                      placeholder="e.g. 284198271 or MTN-TXN-..."
+                      className="w-full border border-[#EBEBEB] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0070BA] bg-white"
+                    />
+                  </div>
+
                   {/* Submit Button */}
                   <button
                     type="submit"
                     disabled={paymentState === "requesting"}
-                    className="w-full bg-[#28A745] hover:bg-[#218838] disabled:bg-gray-300 text-white font-bold text-sm py-3 px-4 rounded-full active:scale-98 transition-all flex items-center justify-center gap-2"
+                    className="w-full bg-[#28A745] hover:bg-[#218838] disabled:bg-gray-300 text-white font-bold text-sm py-3 px-4 rounded-full active:scale-98 transition-all flex items-center justify-center gap-2 cursor-pointer"
                   >
                     {paymentState === "requesting" ? (
                       <>
                         <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        <span>Connecting MNO node...</span>
+                        <span>Recording deposit...</span>
                       </>
                     ) : (
-                      <span>Trigger Payment Prompt</span>
+                      <span>Submit Deposit Reference</span>
                     )}
                   </button>
                 </form>
               </div>
 
-              {/* MOCK PHONE PAYMENT PROMPT OVERLAY MODAL */}
-              {(paymentState === "pin_entry" || paymentState === "requesting" && enteredPin.length === 4 || paymentState === "success") && (
+              {/* CLEAN MANUAL DEPOSIT SUCCESS MODAL */}
+              {paymentState === "success" && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-                  
-                  {/* Phone Shell Card */}
-                  <div className="w-[300px] bg-slate-900 border-[8px] border-slate-700 rounded-[36px] overflow-hidden shadow-2xl relative animate-scale-up aspect-[9/18] flex flex-col justify-between">
+                  <div className="bg-white border border-[#EBEBEB] rounded-3xl p-8 max-w-sm w-full text-center space-y-6 shadow-2xl animate-scale-up">
+                    <div className="h-14 w-14 bg-green-100 text-success-green rounded-full flex items-center justify-center mx-auto shadow-inner">
+                      <Check className="h-7 w-7 stroke-[3.5px]" />
+                    </div>
+                    <div className="space-y-2">
+                      <h4 className="text-lg font-bold text-slate-800">Deposit Submitted!</h4>
+                      <p className="text-xs text-slate-500 font-light leading-relaxed">
+                        Successfully submitted manual deposit of <span className="font-semibold text-slate-800">ZMW {payAmount}</span>. It is pending approval by the group treasurer.
+                      </p>
+                      <div className="bg-slate-50 border border-[#EBEBEB] rounded-xl p-3 font-mono text-[10px] text-slate-600 break-all select-all">
+                        Tx Ref: {simulatedTxRef}
+                      </div>
+                    </div>
                     
-                    {/* Top Speaker notch */}
-                    <div className="h-5 bg-slate-900 w-full flex justify-center items-start shrink-0">
-                      <div className="h-3 w-28 bg-slate-800 rounded-b-xl" />
-                    </div>
-
-                    {/* Simulated screen body */}
-                    <div className="flex-1 bg-[#F5F7FA] p-4 flex flex-col justify-between overflow-hidden relative">
-                      {paymentState === "pin_entry" && (
-                        <>
-                          <div className="space-y-4">
-                            {/* Provider banner */}
-                            <div className={`p-2.5 rounded-xl text-center text-xs font-bold text-white shadow-sm ${
-                              payProvider === "mtn" ? "bg-[#FFCC00] text-[#001C3D]" : "bg-[#E11900]"
-                            }`}>
-                              {payProvider === "mtn" ? "MTN Mobile Money" : "Airtel Mobile Money"}
-                            </div>
-
-                            {/* Message prompt */}
-                            <div className="text-center space-y-2">
-                              <p className="text-xs font-bold text-slate-700">Enter Wallet PIN</p>
-                              <p className="text-[10px] text-slate-500 font-light leading-relaxed">
-                                Please approve deposit prompt of <strong className="font-semibold text-slate-800">ZMW {payAmount}</strong> to {activeGroup.name}.
-                              </p>
-                              
-                              {/* Display asterisks */}
-                              <div className="h-8 flex items-center justify-center gap-2">
-                                {[...Array(4)].map((_, i) => (
-                                  <span key={i} className={`h-2.5 w-2.5 rounded-full border border-gray-400 ${
-                                    enteredPin.length > i ? "bg-slate-800" : "bg-transparent"
-                                  }`} />
-                                ))}
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Keypad */}
-                          <div className="space-y-2">
-                            <div className="grid grid-cols-3 gap-2">
-                              {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map(n => (
-                                <button
-                                  key={n}
-                                  onClick={() => handleKeypadPress(n)}
-                                  className="h-10 bg-white hover:bg-gray-100 border border-gray-200 rounded-lg text-sm font-bold text-slate-700 active:scale-95 transition-all shadow-xs"
-                                >
-                                  {n}
-                                </button>
-                              ))}
-                              <button
-                                onClick={handleKeypadClear}
-                                className="h-10 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg text-[10px] font-bold text-red-600 active:scale-95 transition-all"
-                              >
-                                Clear
-                              </button>
-                              <button
-                                onClick={() => handleKeypadPress("0")}
-                                className="h-10 bg-white hover:bg-gray-100 border border-gray-200 rounded-lg text-sm font-bold text-slate-700 active:scale-95 transition-all shadow-xs"
-                              >
-                                0
-                              </button>
-                              <button
-                                onClick={handleApprovePayment}
-                                className="h-10 bg-green-50 hover:bg-green-100 border border-green-200 rounded-lg text-[10px] font-bold text-green-700 active:scale-95 transition-all"
-                              >
-                                Send
-                              </button>
-                            </div>
-                          </div>
-                        </>
-                      )}
-
-                      {/* Loading status */}
-                      {paymentState === "requesting" && (
-                        <div className="flex-grow flex flex-col items-center justify-center text-center space-y-4">
-                          <div className="h-10 w-10 border-4 border-[#0070BA] border-t-transparent rounded-full animate-spin" />
-                          <div>
-                            <p className="text-xs font-bold text-[#001C3D]">Processing Transaction</p>
-                            <p className="text-[10px] text-[#545658]/70 font-light mt-1">Contacting network operator node...</p>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Success screen */}
-                      {paymentState === "success" && (
-                        <div className="flex-grow flex flex-col items-center justify-center text-center space-y-6 animate-scale-up">
-                          <div className="h-12 w-12 bg-green-100 text-success-green rounded-full flex items-center justify-center shadow-inner">
-                            <Check className="h-6 w-6 stroke-[3.5px]" />
-                          </div>
-                          <div className="space-y-2">
-                            <p className="text-sm font-bold text-slate-800">Payment Confirmed!</p>
-                            <p className="text-[10px] text-slate-500 font-light leading-relaxed">
-                              Successfully deposited ZMW {payAmount} savings. Ledger balance updated.
-                            </p>
-                            <div className="bg-slate-100 border border-slate-200 rounded-lg p-2 font-mono text-[9px] text-slate-600">
-                              Ref: {simulatedTxRef}
-                            </div>
-                          </div>
-                          
-                          <button
-                            onClick={() => { setPaymentState("idle"); setActiveTab("overview"); }}
-                            className="bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold px-6 py-2.5 rounded-full"
-                          >
-                            Return to Hub
-                          </button>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Bottom home bar notch */}
-                    <div className="h-4 bg-slate-900 w-full flex justify-center items-center shrink-0">
-                      <div className="h-1 w-24 bg-slate-800 rounded-full" />
-                    </div>
-
+                    <button
+                      onClick={() => { setPaymentState("idle"); setActiveTab("overview"); }}
+                      className="w-full bg-[#0070BA] hover:bg-[#005EA6] text-white text-xs font-bold py-3 rounded-full cursor-pointer transition-all active:scale-98"
+                    >
+                      Return to Hub
+                    </button>
                   </div>
-
                 </div>
               )}
 
