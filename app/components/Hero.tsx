@@ -12,12 +12,6 @@ export default function Hero() {
 
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 relative z-10">
         <div className="flex flex-col items-center text-center lg:max-w-4xl lg:mx-auto">
-          {/* Tagline */}
-          <div className="inline-flex items-center gap-2 rounded-full bg-[#0070BA]/10 px-4 py-1.5 text-[13px] font-bold tracking-wide text-[#0070BA] mb-8">
-            <ShieldCheck className="h-4 w-4" />
-            <span>Guaranteed Direct Wallet Settlements</span>
-          </div>
-
           {/* Heading */}
           <h1 className="font-display text-4xl font-extrabold tracking-tight text-[#001C3D] sm:text-5xl lg:text-6xl leading-[1.1] max-w-3xl">
             The secure way to save, borrow, and grow together.
@@ -45,22 +39,6 @@ export default function Hero() {
             >
               <span>Watch Live Demo</span>
             </Link>
-          </div>
-
-          {/* Trust strip */}
-          <div className="mt-12 flex flex-wrap items-center justify-center gap-x-8 gap-y-4 text-sm text-[#2C2E2F]/70 border-t border-[#EBEBEB] pt-8 w-full max-w-xl">
-            <span className="flex items-center gap-2">
-              <span className="h-1.5 w-1.5 rounded-full bg-success-green"></span>
-              No deposit fees
-            </span>
-            <span className="flex items-center gap-2">
-              <span className="h-1.5 w-1.5 rounded-full bg-success-green"></span>
-              Zero-custody security
-            </span>
-            <span className="flex items-center gap-2">
-              <span className="h-1.5 w-1.5 rounded-full bg-success-green"></span>
-              Real-time SMS alerts
-            </span>
           </div>
         </div>
       </div>

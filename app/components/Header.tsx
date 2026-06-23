@@ -12,12 +12,7 @@ export default function Header() {
         <div className="flex items-center gap-10">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-1.5 group" id="logo-link">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#0070BA] text-white shadow-sm font-display text-lg font-bold tracking-tight">
-              s
-            </div>
-            <span className="font-display text-2xl font-extrabold tracking-tight text-[#001C3D]">
-              sa<span className="text-[#0070BA] font-bold">vora</span>
-            </span>
+            <span className="font-display text-3xl font-black tracking-tight text-black">SAVORA</span>
           </Link>
 
           {/* Desktop Navigation */}

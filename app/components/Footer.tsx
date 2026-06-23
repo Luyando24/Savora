@@ -11,12 +11,7 @@ export default function Footer() {
         <div className="flex flex-col md:flex-row items-center justify-between gap-6 border-b border-[#EBEBEB] pb-8 mb-8">
           {/* Logo & Name */}
           <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#0070BA] text-white">
-              <span className="font-display text-sm font-bold">s</span>
-            </div>
-            <span className="font-display text-lg font-bold text-[#001C3D]">
-              sa<span className="text-[#0070BA] font-bold">vora</span>
-            </span>
+            <span className="font-display text-3xl font-black tracking-tight text-black">SAVORA</span>
           </div>
 
           {/* Links */}

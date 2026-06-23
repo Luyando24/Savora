@@ -35,6 +35,7 @@ import {
   Printer
 } from "lucide-react";
 import { getSupabaseClient } from "@/app/lib/supabase";
+import MobileBottomNav from "./MobileBottomNav";
 
 interface Member {
   id: string;
@@ -716,12 +717,7 @@ export default function DashboardView() {
           {/* Brand header */}
           <div className="h-16 flex items-center justify-between px-6 border-b border-white/10 shrink-0">
             <a href="/" className="flex items-center gap-2 group">
-              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-white text-[#001C3D] font-display text-sm font-bold">
-                s
-              </div>
-              <span className="font-display text-lg font-extrabold tracking-tight">
-                sa<span className="text-[#0070BA] font-bold">vora</span>
-              </span>
+              <span className="font-display text-3xl font-black tracking-tight text-black">SAVORA</span>
             </a>
             {/* Mobile close sidebar button */}
             <button 
@@ -1969,6 +1965,16 @@ export default function DashboardView() {
           </form>
         </div>
       )}
+
+      {/* Mobile Bottom Navigation */}
+      <MobileBottomNav 
+        activeTab={activeTab} 
+        onTabChange={(tab) => { 
+          setActiveTab(tab as any); 
+          handleBackToDashboard(); 
+        }} 
+        variant="treasurer"
+      />
 
     </div>
   );

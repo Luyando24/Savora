@@ -26,6 +26,7 @@ import {
   Activity
 } from "lucide-react";
 import { getSupabaseClient } from "@/app/lib/supabase";
+import MobileBottomNav from "./MobileBottomNav";
 
 interface GroupContext {
   id: string;
@@ -466,12 +467,7 @@ export default function MemberDashboardView() {
           {/* Brand header */}
           <div className="h-16 flex items-center justify-between px-6 border-b border-white/10 shrink-0">
             <a href="/" className="flex items-center gap-2">
-              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-white text-[#001C3D] font-display text-sm font-bold">
-                s
-              </div>
-              <span className="font-display text-lg font-extrabold tracking-tight">
-                sa<span className="text-[#0070BA] font-bold">vora</span>
-              </span>
+              <span className="font-display text-3xl font-black tracking-tight text-black">SAVORA</span>
             </a>
             <button 
               onClick={() => setIsSidebarOpen(false)}
@@ -1152,6 +1148,15 @@ export default function MemberDashboardView() {
 
         </main>
       </div>
+
+      {/* Mobile Bottom Navigation */}
+      <MobileBottomNav 
+        activeTab={activeTab} 
+        onTabChange={(tab) => { 
+          setActiveTab(tab as any); 
+        }} 
+        variant="member"
+      />
 
     </div>
   );

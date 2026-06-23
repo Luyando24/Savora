@@ -199,12 +199,7 @@ export default function LoginPage() {
       <header className="h-20 border-b border-[#EBEBEB] bg-white flex items-center shrink-0 z-20 shadow-xs">
         <div className="mx-auto max-w-7xl w-full px-4 sm:px-6 lg:px-8">
           <Link href="/" className="flex items-center gap-1.5 group w-fit">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#0070BA] text-white shadow-sm font-display text-lg font-bold tracking-tight">
-              s
-            </div>
-            <span className="font-display text-2xl font-extrabold tracking-tight text-[#001C3D]">
-              sa<span className="text-[#0070BA] font-bold">vora</span>
-            </span>
+            <span className="font-display text-3xl font-black tracking-tight text-black">SAVORA</span>
           </Link>
         </div>
       </header>
@@ -458,11 +453,6 @@ export default function LoginPage() {
               </button>
             </div>
           )}
-
-          <div className="text-center text-[10px] text-[#545658]/60 flex items-center justify-center gap-1.5 font-mono pt-4 border-t border-[#EBEBEB]">
-            <ShieldCheck className="h-4 w-4 text-[#0070BA]" />
-            <span>Secure account registration & login • chi-limba verification nodes</span>
-          </div>
         </div>
       </main>
 

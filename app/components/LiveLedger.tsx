@@ -320,10 +320,6 @@ export default function LiveLedger() {
     <section id="demo-ledger" className="py-20 bg-[#F5F7FA]">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="text-center max-w-3xl mx-auto mb-12">
-          <div className="inline-flex items-center gap-1 bg-[#0070BA]/10 text-[#0070BA] text-[12px] font-bold px-3 py-1 rounded-full uppercase tracking-wider mb-4">
-            <Sparkles className="h-3 w-3" />
-            <span>Interactive Demo</span>
-          </div>
           <h2 className="font-display text-3xl font-extrabold tracking-tight text-[#001C3D] sm:text-4xl">
             Watch how payments post instantly.
           </h2>
