@@ -39,3 +39,13 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# supabase
+supabase/.temp/
+
+# sensitive files
+*.key
+*.p12
+*.pfx
+credentials.json
+service-account.json

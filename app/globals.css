@@ -1,26 +1,26 @@
 @import "tailwindcss";
 
+@theme {
+  --font-display: "Plus Jakarta Sans", ui-sans-serif, system-ui;
+  --font-sans: "Inter", ui-sans-serif, system-ui;
+  
+  --color-paypal-blue: #0070BA;
+  --color-deep-navy: #003087;
+  --color-light-ice: #F5F7FA;
+  --color-pure-white: #FFFFFF;
+  --color-success-green: #28A745;
+  --color-airtel-red: #E11900;
+  --color-mtn-yellow: #FFCC00;
+  --color-slate-ink: #1C2421;
+}
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --background: #F5F7FA;
+  --foreground: #1C2421;
 }
 
 body {
-  background: var(--background);
+  background-color: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
 }
