@@ -151,6 +151,14 @@ export default function DashboardView() {
   const [groupTargetGoal, setGroupTargetGoal] = useState(6000);
   const [cycleSettings, setCycleSettings] = useState<any>({});
 
+  // Group rename state
+  const [pendingProposal, setPendingProposal] = useState<any>(null);
+  const [proposedNameInput, setProposedNameInput] = useState("");
+  const [proposeError, setProposeError] = useState("");
+  const [proposeSuccess, setProposeSuccess] = useState("");
+  const [isProposing, setIsProposing] = useState(false);
+  const [copiedInvite, setCopiedInvite] = useState(false);
+
   const loadDashboardData = async (groupId: string) => {
     try {
       const supabase = getSupabaseClient();
@@ -291,6 +299,16 @@ export default function DashboardView() {
         });
       }
       setNotifications(recentNotifications);
+
+      // 5. Fetch Pending Rename Proposal
+      const { data: proposalData } = await supabase
+        .from("group_name_proposals")
+        .select("*")
+        .eq("group_id", groupId)
+        .eq("status", "pending")
+        .maybeSingle();
+
+      setPendingProposal(proposalData);
 
     } catch (err: any) {
       console.error("Error loading dashboard data:", err);
@@ -630,6 +648,98 @@ export default function DashboardView() {
 
   const handleBackToDashboard = () => {
     router.push(`/dashboard?id=${groupRef}`);
+  };
+
+  const handleProposeRename = async () => {
+    setProposeError("");
+    setProposeSuccess("");
+    if (!proposedNameInput.trim()) {
+      setProposeError("Please enter a proposed name.");
+      return;
+    }
+    if (proposedNameInput.trim() === groupName) {
+      setProposeError("Proposed name must be different from the current name.");
+      return;
+    }
+
+    setIsProposing(true);
+    try {
+      const supabase = getSupabaseClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        setProposeError("You must be logged in.");
+        return;
+      }
+
+      const response = await fetch("/api/groups/rename", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({
+          groupId: groupRef,
+          proposedName: proposedNameInput
+        })
+      });
+
+      const resData = await response.json();
+      if (!response.ok) {
+        setProposeError(resData.error || "Failed to propose rename.");
+        return;
+      }
+
+      setProposeSuccess("Rename proposal submitted successfully. Waiting for a member to approve.");
+      setProposedNameInput("");
+      
+      await loadDashboardData(groupRef);
+    } catch (err: any) {
+      setProposeError("An error occurred: " + err.message);
+    } finally {
+      setIsProposing(false);
+    }
+  };
+
+  const handleCancelRename = async (proposalId: string) => {
+    setProposeError("");
+    setProposeSuccess("");
+    try {
+      const supabase = getSupabaseClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const response = await fetch("/api/groups/reject-name", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({
+          proposalId
+        })
+      });
+
+      const resData = await response.json();
+      if (!response.ok) {
+        setProposeError(resData.error || "Failed to cancel proposal.");
+        return;
+      }
+
+      setProposeSuccess("Proposal cancelled successfully.");
+      await loadDashboardData(groupRef);
+    } catch (err: any) {
+      setProposeError("An error occurred: " + err.message);
+    }
+  };
+
+  const handleCopyInviteLink = () => {
+    if (typeof window === "undefined") return;
+    const inviteUrl = `${window.location.origin}/invite?groupId=${groupRef}`;
+    navigator.clipboard.writeText(inviteUrl);
+    setCopiedInvite(true);
+    setTimeout(() => {
+      setCopiedInvite(false);
+    }, 2000);
   };
 
   const handlePrint = () => {
@@ -1512,13 +1622,35 @@ export default function DashboardView() {
                       />
                       <Search className="absolute left-3.5 top-2.5 h-4 w-4 text-gray-400" />
                     </div>
-                    <button
-                      onClick={() => setIsMemberModalOpen(true)}
-                      className="inline-flex items-center gap-1.5 bg-[#0070BA] text-white text-xs font-bold px-4 py-2 rounded-full hover:bg-[#005EA6]"
-                    >
-                      <UserPlus className="h-4 w-4" />
-                      <span>Register Member</span>
-                    </button>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={handleCopyInviteLink}
+                        className={`inline-flex items-center gap-1.5 text-xs font-bold px-4 py-2 rounded-full active:scale-95 transition-all cursor-pointer shadow-xs border ${
+                          copiedInvite 
+                            ? "bg-[#28A745]/10 border-[#28A745] text-[#28A745]" 
+                            : "bg-[#F5F7FA] border-[#EBEBEB] text-[#001C3D] hover:bg-gray-100"
+                        }`}
+                      >
+                        {copiedInvite ? (
+                          <>
+                            <CheckCircle2 className="h-4.5 w-4.5" />
+                            <span>Link Copied!</span>
+                          </>
+                        ) : (
+                          <>
+                            <Plus className="h-4.5 w-4.5" />
+                            <span>Copy Invite Link</span>
+                          </>
+                        )}
+                      </button>
+                      <button
+                        onClick={() => setIsMemberModalOpen(true)}
+                        className="inline-flex items-center gap-1.5 bg-[#0070BA] text-white text-xs font-bold px-4 py-2 rounded-full hover:bg-[#005EA6] active:scale-95 transition-all cursor-pointer shadow-xs"
+                      >
+                        <UserPlus className="h-4.5 w-4.5" />
+                        <span>Register Member</span>
+                      </button>
+                    </div>
                   </div>
 
                   <div className="bg-white border border-[#EBEBEB] rounded-[20px] overflow-hidden shadow-xs">
@@ -1729,6 +1861,76 @@ export default function DashboardView() {
                         </div>
                       )}
                     </div>
+
+                    {/* Group Renaming Panel */}
+                    <div className="space-y-3 md:col-span-2 border-t border-[#EBEBEB] pt-6 mt-2">
+                      <p className="font-bold text-[#001C3D]">Rename Group Node</p>
+                      <p className="text-[11px] text-[#545658]/70 leading-relaxed font-light">
+                        Propose a new name for this group circle. For security and trust compliance, the name change will only become active once at least one other registered member approves the change.
+                      </p>
+                      
+                      {pendingProposal ? (
+                        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-3 mt-2">
+                          <div className="flex items-start gap-2.5">
+                            <AlertCircle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+                            <div>
+                              <p className="font-semibold text-amber-800 text-xs">Pending Rename Proposal</p>
+                              <p className="text-xs text-[#545658] mt-1">
+                                Change group name from <strong className="font-semibold">"{groupName}"</strong> to <strong className="font-bold">"{pendingProposal.proposed_name}"</strong>.
+                              </p>
+                              <p className="text-[10px] text-amber-600/80 mt-1 font-light">
+                                Proposed on {new Date(pendingProposal.created_at).toLocaleDateString()}. Waiting for 1 more member to approve.
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex justify-end pt-1">
+                            <button
+                              type="button"
+                              onClick={() => handleCancelRename(pendingProposal.id)}
+                              className="px-4 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-bold rounded-full transition-colors active:scale-95 cursor-pointer"
+                            >
+                              Cancel Proposal
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col sm:flex-row gap-3 items-end max-w-md mt-2">
+                          <div className="flex-grow flex flex-col gap-1">
+                            <label htmlFor="proposed-name-input" className="text-[10px] uppercase font-bold text-slate-500">Proposed New Name</label>
+                            <input
+                              type="text"
+                              id="proposed-name-input"
+                              value={proposedNameInput}
+                              onChange={(e) => setProposedNameInput(e.target.value)}
+                              placeholder="e.g. Tusunge Savings Cooperative"
+                              className="border border-[#EBEBEB] rounded-lg p-2 text-xs focus:outline-none focus:ring-1 focus:ring-[#0070BA] bg-white w-full"
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={handleProposeRename}
+                            disabled={isProposing}
+                            className="bg-[#0070BA] hover:bg-[#005EA6] text-white text-xs font-bold px-5 py-2.5 rounded-full transition-all active:scale-95 disabled:opacity-50 shrink-0 cursor-pointer"
+                          >
+                            {isProposing ? "Submitting..." : "Propose Rename"}
+                          </button>
+                        </div>
+                      )}
+                      
+                      {proposeError && (
+                        <p className="text-xs text-[#E11900] font-semibold mt-1 flex items-center gap-1.5">
+                          <AlertCircle className="h-4 w-4" />
+                          <span>{proposeError}</span>
+                        </p>
+                      )}
+                      {proposeSuccess && (
+                        <p className="text-xs text-[#28A745] font-semibold mt-1 flex items-center gap-1.5">
+                          <CheckCircle2 className="h-4 w-4" />
+                          <span>{proposeSuccess}</span>
+                        </p>
+                      )}
+                    </div>
+
                   </div>
                 </div>
               )}

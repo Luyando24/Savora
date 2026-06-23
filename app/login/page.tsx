@@ -83,33 +83,27 @@ export default function LoginPage() {
 
     setIsSubmitting(true);
     try {
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: email.trim(),
-        password: password,
-        options: {
-          data: {
-            name: name.trim(),
-          }
-        }
+      const response = await fetch("/api/auth/signup", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          name: name.trim(),
+          email: email.trim(),
+          password
+        })
       });
 
-      if (authError) {
-        setError(authError.message);
+      const resData = await response.json();
+      if (!response.ok) {
+        setError(resData.error || "Failed to create account.");
         setIsSubmitting(false);
         return;
       }
 
-      setSuccessMessage("Account created successfully!");
-      
-      const userEmail = authData.user?.email || email.trim();
-      
-      // Auto-query memberships if signed in immediately, otherwise prompt them to sign in
-      if (authData.session) {
-        await checkMemberships(userEmail);
-      } else {
-        setStep("login");
-        setSuccessMessage("Account created! Please sign in with your password.");
-      }
+      setSuccessMessage("Account created successfully! Please sign in with your password.");
+      setStep("login");
     } catch (err: any) {
       setError(err?.message || "An unexpected error occurred during sign up.");
     } finally {

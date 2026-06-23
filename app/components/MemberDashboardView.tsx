@@ -90,6 +90,11 @@ export default function MemberDashboardView() {
   // Group-wide lightweight logs
   const [groupActivities, setGroupActivities] = useState<{ id: number; text: string; time: string }[]>([]);
 
+  // Group rename proposal state
+  const [pendingProposal, setPendingProposal] = useState<any>(null);
+  const [proposalActionError, setProposalActionError] = useState("");
+  const [proposalActionSuccess, setProposalActionSuccess] = useState("");
+
   // Request-to-Pay simulator states
   const [payAmount, setPayAmount] = useState("150");
   const [payProvider, setPayProvider] = useState<"mtn" | "airtel">("mtn");
@@ -244,6 +249,16 @@ export default function MemberDashboardView() {
             };
           });
           setGroupActivities(compiledActivities);
+
+          // Fetch pending rename proposal
+          const { data: proposalData } = await supabase
+            .from("group_name_proposals")
+            .select("*")
+            .eq("group_id", targetGroup.id)
+            .eq("status", "pending")
+            .maybeSingle();
+
+          setPendingProposal(proposalData);
         }
       }
 
@@ -302,6 +317,72 @@ export default function MemberDashboardView() {
     setActiveGroupIndex(index);
     setIsGroupDropdownOpen(false);
     setActiveTab("overview");
+  };
+
+  const handleApproveProposal = async () => {
+    if (!pendingProposal) return;
+    setProposalActionError("");
+    setProposalActionSuccess("");
+    try {
+      const supabase = getSupabaseClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const response = await fetch("/api/groups/approve-name", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({
+          proposalId: pendingProposal.id
+        })
+      });
+
+      const resData = await response.json();
+      if (!response.ok) {
+        setProposalActionError(resData.error || "Failed to approve name change.");
+        return;
+      }
+
+      setProposalActionSuccess("Group renamed successfully!");
+      await loadMemberData("", activeGroupIndex);
+    } catch (err: any) {
+      setProposalActionError("An error occurred: " + err.message);
+    }
+  };
+
+  const handleRejectProposal = async () => {
+    if (!pendingProposal) return;
+    setProposalActionError("");
+    setProposalActionSuccess("");
+    try {
+      const supabase = getSupabaseClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const response = await fetch("/api/groups/reject-name", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({
+          proposalId: pendingProposal.id
+        })
+      });
+
+      const resData = await response.json();
+      if (!response.ok) {
+        setProposalActionError(resData.error || "Failed to reject proposal.");
+        return;
+      }
+
+      setProposalActionSuccess("Rename proposal rejected.");
+      await loadMemberData("", activeGroupIndex);
+    } catch (err: any) {
+      setProposalActionError("An error occurred: " + err.message);
+    }
   };
 
   // Payment triggers
@@ -653,6 +734,49 @@ export default function MemberDashboardView() {
           {/* TAB: OVERVIEW */}
           {activeTab === "overview" && (
             <div className="space-y-6 animate-fade-in">
+              
+              {/* Name Change Proposal Approval Banner */}
+              {pendingProposal && (
+                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6 shadow-xs space-y-4 animate-fade-in">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+                    <div className="flex-grow">
+                      <h4 className="text-sm font-bold text-[#001C3D]">Proposed Group Name Change</h4>
+                      <p className="text-xs text-[#545658] mt-1 font-light leading-relaxed">
+                        An administrator has proposed to rename this group from <strong className="font-semibold">"{activeGroup.name}"</strong> to <strong className="font-bold">"{pendingProposal.proposed_name}"</strong>.
+                        This change will only go live if at least one other member approves it.
+                      </p>
+                      {proposalActionError && (
+                        <p className="text-xs text-[#E11900] font-semibold mt-2 flex items-center gap-1.5">
+                          <AlertCircle className="h-4 w-4" />
+                          <span>{proposalActionError}</span>
+                        </p>
+                      )}
+                      {proposalActionSuccess && (
+                        <p className="text-xs text-[#28A745] font-semibold mt-2 flex items-center gap-1.5">
+                          <CheckCircle2 className="h-4 w-4" />
+                          <span>{proposalActionSuccess}</span>
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex gap-3 justify-end">
+                    <button
+                      onClick={handleRejectProposal}
+                      className="px-4 py-2 border border-amber-200 hover:bg-amber-100/50 text-amber-800 text-xs font-bold rounded-full transition-colors cursor-pointer"
+                    >
+                      Reject Change
+                    </button>
+                    <button
+                      onClick={handleApproveProposal}
+                      className="px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-full transition-colors cursor-pointer shadow-sm active:scale-95"
+                    >
+                      Approve Rename
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 
                 {/* Savings Balance Card */}
