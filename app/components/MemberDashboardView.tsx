@@ -23,7 +23,8 @@ import {
   Wallet,
   Smartphone,
   Check,
-  Activity
+  Activity,
+  Plus
 } from "lucide-react";
 import { getSupabaseClient } from "@/app/lib/supabase";
 import MobileBottomNav from "./MobileBottomNav";
@@ -31,7 +32,7 @@ import MobileBottomNav from "./MobileBottomNav";
 interface GroupContext {
   id: string;
   name: string;
-  type: "savings" | "agricultural" | "sacco";
+  type: "savings" | "agricultural" | "sacco" | "general";
   balance: number;
   outstandingLoan: number;
   targetGoal: number;
@@ -43,6 +44,7 @@ interface GroupContext {
   walletNumber?: string;
   walletProvider?: string;
   walletHolderName?: string;
+  deadline?: string;
 }
 
 interface PersonalTransaction {
@@ -76,7 +78,7 @@ export default function MemberDashboardView() {
   const [groups, setGroups] = useState<GroupContext[]>([
     {
       id: "grp-1",
-      name: "Tusunge Savings Circle",
+      name: "Tusunge Savings Group",
       type: "savings",
       balance: 1500,
       outstandingLoan: 0,
@@ -89,7 +91,7 @@ export default function MemberDashboardView() {
   const [activeGroupIndex, setActiveGroupIndex] = useState(0);
   const activeGroup = groups[activeGroupIndex] || { 
     id: "empty", 
-    name: "No Active Circle", 
+    name: "No Active Group", 
     type: "savings", 
     balance: 0, 
     outstandingLoan: 0, 
@@ -177,21 +179,22 @@ export default function MemberDashboardView() {
         const cycleSettings = m.groups?.cycle_settings || {};
         return {
           id: m.groups?.id || m.group_id,
-          name: m.groups?.name || "Unknown Circle",
+          name: m.groups?.name || "Unknown Group",
           type: m.groups?.type || "savings",
           balance: Number(summary?.active_balance || 0),
           outstandingLoan: Number(summary?.outstanding_loans || 0),
-          targetGoal: Number(cycleSettings.targetGoal || 6000),
+          targetGoal: Number(cycleSettings.targetGoal || (m.groups?.type === "general" ? 5000 : 6000)),
           nextPayoutDate: cycleSettings.nextPayoutDate || "2026-06-30",
           payoutRecipient: cycleSettings.payoutRecipient || m.name,
           shares: m.groups?.type === "agricultural"
             ? Math.floor(Number(summary?.total_contributions || 0) / (cycleSettings.sharePrice || 150))
             : undefined,
-          contributionAmount: cycleSettings.contributionAmount !== undefined ? Number(cycleSettings.contributionAmount) : 150,
+          contributionAmount: cycleSettings.contributionAmount !== undefined ? Number(cycleSettings.contributionAmount) : (m.groups?.type === "general" ? 100 : 150),
           isFlexibleContribution: !!cycleSettings.isFlexibleContribution,
           walletNumber: cycleSettings.walletNumber || "",
           walletProvider: cycleSettings.walletProvider || "mtn",
-          walletHolderName: cycleSettings.walletHolderName || ""
+          walletHolderName: cycleSettings.walletHolderName || "",
+          deadline: cycleSettings.deadline || ""
         };
       });
       setGroups(compiledGroups);
@@ -261,7 +264,7 @@ export default function MemberDashboardView() {
             if (t.type === "contribution") actionText = `deposited ZMW ${t.amount} savings.`;
             else if (t.type === "repayment") actionText = `posted loan repayment of ZMW ${t.amount}.`;
             else if (t.type === "loan_disbursement") actionText = `received a loan payout of ZMW ${t.amount}.`;
-            else actionText = `received ZMW ${t.amount} cycle payout.`;
+            else actionText = `received ZMW ${t.amount} payout.`;
 
             return {
               id: index + 1,
@@ -322,10 +325,11 @@ export default function MemberDashboardView() {
         setPayAmount(String(activeGroup.outstandingLoan));
       } else {
         setPayType("contribution");
+        const defaultAmount = activeGroup.type === "general" ? "100" : "150";
         setPayAmount(
-          activeGroup.type === "savings" && !activeGroup.isFlexibleContribution
-            ? String(activeGroup.contributionAmount || "150")
-            : "150"
+          (activeGroup.type === "savings" || activeGroup.type === "general") && !activeGroup.isFlexibleContribution
+            ? String(activeGroup.contributionAmount || defaultAmount)
+            : defaultAmount
         );
       }
     }
@@ -549,10 +553,10 @@ export default function MemberDashboardView() {
     <div className="flex h-full w-full overflow-hidden relative font-sans">
 
       {/* 1. LEFT SIDEBAR PANEL (Desktop persistent, Mobile sliding drawer) */}
-      <aside className={`fixed inset-y-0 left-0 z-40 w-64 bg-[#001C3D] text-white flex flex-col justify-between shrink-0 transition-transform duration-300 md:translate-x-0 md:relative ${
+      <aside className={`fixed inset-y-0 left-0 z-[60] w-64 bg-[#001C3D] text-white flex flex-col justify-between shrink-0 transition-transform duration-300 md:translate-x-0 md:relative ${
         isSidebarOpen ? "translate-x-0" : "-translate-x-full"
       }`}>
-        <div>
+        <div className="overflow-y-auto flex-1">
           {/* Brand header */}
           <div className="h-16 flex items-center justify-between px-6 border-b border-white/10 shrink-0">
             <a href="/" className="flex items-center gap-2">
@@ -595,6 +599,17 @@ export default function MemberDashboardView() {
                       <span className="text-[9px] uppercase px-1.5 py-0.5 rounded bg-white/10 text-white/60 font-light">{g.type}</span>
                     </button>
                   ))}
+                  
+                  <button
+                    onClick={() => {
+                      setIsGroupDropdownOpen(false);
+                      router.push("/create-group");
+                    }}
+                    className="w-full text-left px-4 py-2.5 text-xs font-bold text-[#38bdf8] hover:text-white hover:bg-white/5 flex items-center gap-2 transition-colors cursor-pointer border-t border-white/5"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    <span>Create New Group</span>
+                  </button>
                 </div>
               </div>
             )}
@@ -679,7 +694,7 @@ export default function MemberDashboardView() {
       {isSidebarOpen && (
         <div 
           onClick={() => setIsSidebarOpen(false)}
-          className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-30 md:hidden" 
+          className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[55] md:hidden" 
         />
       )}
 
@@ -705,7 +720,7 @@ export default function MemberDashboardView() {
 
           <div className="flex items-center gap-2">
             <span className="hidden sm:inline-flex items-center text-[10px] font-bold text-[#0070BA] bg-[#0070BA]/5 border border-[#0070BA]/10 px-3 py-1 rounded-full uppercase tracking-wider">
-              {activeGroup.type} Circle
+              {activeGroup.type} Group
             </span>
           </div>
         </header>
@@ -722,7 +737,7 @@ export default function MemberDashboardView() {
           {/* Active Circle Alert Card */}
           <div className="bg-white rounded-2xl border border-[#EBEBEB] p-6 shadow-xs flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
             <div>
-              <p className="text-[10px] font-bold text-[#0070BA] uppercase tracking-wider">Connected Circle</p>
+              <p className="text-[10px] font-bold text-[#0070BA] uppercase tracking-wider">Connected Group</p>
               <h3 className="text-xl font-extrabold text-[#001C3D] mt-1">{activeGroup.name}</h3>
               <p className="text-xs text-[#545658] font-light mt-1">
                 Your registered mobile money number: <strong className="font-semibold">{memberPhone}</strong>
@@ -848,6 +863,27 @@ export default function MemberDashboardView() {
                       Valued at ZMW {((activeGroup.shares || 0) * 150).toLocaleString()} (ZMW 150/Share)
                     </p>
                   </div>
+                ) : activeGroup.type === "general" ? (
+                  <div className="bg-white border border-[#EBEBEB] rounded-2xl p-6 shadow-xs flex flex-col justify-between min-h-[140px]">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <p className="text-xs font-bold text-[#545658]/60 uppercase tracking-wider">Group Target Goal</p>
+                        <p className="text-2xl font-extrabold text-[#001C3D] mt-2 font-display">
+                          ZMW {activeGroup.targetGoal.toLocaleString()}
+                        </p>
+                      </div>
+                      <div className="h-9 w-9 bg-amber-50 text-amber-600 flex items-center justify-center rounded-xl">
+                        <Coins className="h-4.5 w-4.5" />
+                      </div>
+                    </div>
+                    <p className="text-[10px] text-gray-400 font-light mt-2">
+                      {activeGroup.deadline ? (
+                        <>Target Deadline: {new Date(activeGroup.deadline).toLocaleDateString()}</>
+                      ) : (
+                        <>Flexible fundraising / cause target</>
+                      )}
+                    </p>
+                  </div>
                 ) : (
                   <div className="bg-white border border-[#EBEBEB] rounded-2xl p-6 shadow-xs flex flex-col justify-between min-h-[140px]">
                     <div className="flex justify-between items-start">
@@ -893,9 +929,9 @@ export default function MemberDashboardView() {
                 <div className="bg-white border border-[#EBEBEB] rounded-2xl p-6 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-6">
                   <div className="space-y-1">
                     <h4 className="text-xs font-bold text-[#545658]/60 uppercase tracking-widest">Savings Progress</h4>
-                    <p className="text-lg font-extrabold text-[#001C3D]">Circle Collection Target</p>
+                    <p className="text-lg font-extrabold text-[#001C3D]">Group Collection Target</p>
                     <p className="text-xs text-[#545658]/70 font-light leading-relaxed max-w-xs mt-1">
-                      Our savings circle has gathered ZMW {activeGroup.balance.toLocaleString()} out of a target goal of ZMW {activeGroup.targetGoal.toLocaleString()}.
+                      Our {activeGroup.type === "general" ? "fundraising group" : "savings group"} has gathered ZMW {activeGroup.balance.toLocaleString()} out of a target goal of ZMW {activeGroup.targetGoal.toLocaleString()}.
                     </p>
                   </div>
 
@@ -981,9 +1017,9 @@ export default function MemberDashboardView() {
                             setPayType("contribution"); 
                             setPayError(""); 
                             setPayAmount(
-                              activeGroup.type === "savings" && !activeGroup.isFlexibleContribution
-                                ? String(activeGroup.contributionAmount || "150")
-                                : "150"
+                              (activeGroup.type === "savings" || activeGroup.type === "general") && !activeGroup.isFlexibleContribution
+                                ? String(activeGroup.contributionAmount || (activeGroup.type === "general" ? "100" : "150"))
+                                : (activeGroup.type === "general" ? "100" : "150")
                             );
                           }}
                           className={`py-2.5 text-center text-xs font-bold rounded-xl border transition-all ${
@@ -1022,9 +1058,9 @@ export default function MemberDashboardView() {
                         type="number"
                         id="pay-amt-inp"
                         value={payAmount}
-                        disabled={activeGroup.type === "savings" && payType === "contribution" && !activeGroup.isFlexibleContribution}
+                        disabled={(activeGroup.type === "savings" || activeGroup.type === "general") && payType === "contribution" && !activeGroup.isFlexibleContribution}
                         onChange={(e) => setPayAmount(e.target.value)}
-                        placeholder={activeGroup.type === "savings" && activeGroup.isFlexibleContribution ? "Enter any amount" : String(activeGroup.contributionAmount || "150")}
+                        placeholder={(activeGroup.type === "savings" || activeGroup.type === "general") && activeGroup.isFlexibleContribution ? "Enter any amount" : String(activeGroup.contributionAmount || (activeGroup.type === "general" ? "100" : "150"))}
                         className="w-full border border-[#EBEBEB] rounded-xl pl-12 pr-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0070BA] disabled:bg-slate-50 disabled:text-slate-500"
                       />
                     </div>
@@ -1128,7 +1164,7 @@ export default function MemberDashboardView() {
             <div className="bg-white border border-[#EBEBEB] rounded-[20px] overflow-hidden shadow-xs animate-fade-in">
               <div className="p-6 border-b border-[#EBEBEB] bg-[#F5F7FA]">
                 <h3 className="text-sm font-bold text-[#001C3D] uppercase tracking-wider">My Transaction History</h3>
-                <p className="text-[11px] text-[#545658]/70 mt-0.5">Logs of your verified payments and payouts in this circle</p>
+                <p className="text-[11px] text-[#545658]/70 mt-0.5">Logs of your verified payments and payouts in this group</p>
               </div>
 
               <div className="overflow-x-auto">
@@ -1173,7 +1209,7 @@ export default function MemberDashboardView() {
                     {(!transactions[activeGroup.id] || transactions[activeGroup.id].length === 0) && (
                       <tr>
                         <td colSpan={5} className="px-6 py-12 text-center text-gray-400 font-light">
-                          No transactions found for your account in this circle.
+                          No transactions found for your account in this group.
                         </td>
                       </tr>
                     )}

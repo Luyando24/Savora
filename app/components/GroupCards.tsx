@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Users, Sprout, Landmark, Check } from "lucide-react";
+import { Users, Sprout, Landmark, Check, Coins } from "lucide-react";
 
 export default function GroupCards() {
   const groups = [
@@ -9,7 +9,7 @@ export default function GroupCards() {
       id: "group-savings",
       type: "Savings Groups (Chilimba)",
       problem: "Paper books get lost, and calculating weekly payouts by hand takes hours.",
-      solution: "Tracks contributions automatically, keeps a digital record that every member sees, and flags payout orders when cycles complete.",
+      solution: "Tracks contributions automatically, keeps a digital record that every member sees, and flags payout orders when group rotation rounds complete.",
       features: [
         "Automatic member notification",
         "Clear payout order tracking",
@@ -44,6 +44,19 @@ export default function GroupCards() {
       icon: Landmark,
       badge: "Registered SACCOs",
     },
+    {
+      id: "group-general",
+      type: "General Savings & Fundraising",
+      problem: "Tracking custom fundraising targets, causes, or member contributions by chat gets messy.",
+      solution: "Consolidates causes into one workspace, showing target progress indicators, flexible contribution support, and direct mobile money collection registers.",
+      features: [
+        "Flexible savings targets",
+        "Target goal progress widgets",
+        "Deadline-driven tracking",
+      ],
+      icon: Coins,
+      badge: "Cause & Event Savings",
+    },
   ];
 
   return (
@@ -60,7 +73,7 @@ export default function GroupCards() {
         </div>
 
         {/* Cards Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
           {groups.map((group) => {
             const Icon = group.icon;
             return (

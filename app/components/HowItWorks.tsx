@@ -44,7 +44,7 @@ export default function HowItWorks() {
             Simple. Transparent. Automated.
           </h2>
           <p className="mt-4 text-[17px] text-[#545658] font-light">
-            Digitizing the manual ledger cycle in four clear steps.
+            Digitizing the manual ledger process in four clear steps.
           </p>
         </div>
 

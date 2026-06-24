@@ -14,7 +14,13 @@ export const getSupabaseClient = () => {
   if (!supabaseInstance) {
     const url = supabaseUrl || 'https://placeholder.supabase.co';
     const key = supabaseAnonKey || 'placeholder';
-    supabaseInstance = createClient(url, key);
+    supabaseInstance = createClient(url, key, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+      },
+    });
   }
   return supabaseInstance;
 };

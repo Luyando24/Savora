@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ShieldCheck, ArrowRight, Mail, Lock, Users, User, LogOut } from "lucide-react";
@@ -27,6 +27,17 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [memberships, setMemberships] = useState<Membership[]>([]);
+
+  useEffect(() => {
+    const checkActiveSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session && session.user?.email) {
+        setEmail(session.user.email);
+        await checkMemberships(session.user.email);
+      }
+    };
+    checkActiveSession();
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -136,7 +147,7 @@ export default function LoginPage() {
 
       if (!dbMembers || dbMembers.length === 0) {
         // Logged in but not in any database groups
-        setError("This account is not yet registered in any savings circle or cooperative. Please ask your group treasurer to add your email, or create a new circle.");
+        setError("This account is not yet registered in any savings group or cooperative. Please ask your group treasurer to add your email, or create a new group.");
         return;
       }
 
@@ -146,7 +157,7 @@ export default function LoginPage() {
         name: m.name,
         role: m.role as "member" | "treasurer",
         group_id: m.group_id,
-        groupName: m.groups?.name || "Unknown Circle",
+        groupName: m.groups?.name || "Unknown Group",
         groupType: m.groups?.type || "savings",
       }));
 
@@ -165,7 +176,7 @@ export default function LoginPage() {
         setStep("select_group");
       }
     } catch (err: any) {
-      setError("Failed to resolve circle membership: " + err.message);
+      setError("Failed to resolve group membership: " + err.message);
     }
   };
 
@@ -426,7 +437,7 @@ export default function LoginPage() {
                     <div className="space-y-1 overflow-hidden pr-2">
                        <p className="text-sm font-bold text-[#001C3D] truncate">{mem.groupName}</p>
                       <div className="flex items-center gap-2 text-[10px] text-[#545658]/70">
-                        <span className="capitalize">{mem.groupType} circle</span>
+                        <span className="capitalize">{mem.groupType} group</span>
                         <span className="h-1 w-1 bg-slate-300 rounded-full" />
                         <span className="capitalize font-semibold text-[#0070BA]">{mem.role}</span>
                       </div>

@@ -87,7 +87,7 @@ export default function DashboardView() {
   const router = useRouter();
   // Group states
   const [groupName, setGroupName] = useState("Loading Workspace...");
-  const [groupType, setGroupType] = useState<"savings" | "agricultural" | "sacco">("savings");
+  const [groupType, setGroupType] = useState<"savings" | "agricultural" | "sacco" | "general">("savings");
   const [groupRef, setGroupRef] = useState("");
   const [walletNum, setWalletNum] = useState("");
   const [walletProvider, setWalletProvider] = useState<"mtn" | "airtel">("mtn");
@@ -181,6 +181,7 @@ export default function DashboardView() {
   const [settingsSuccess, setSettingsSuccess] = useState("");
   const [editIsFlexibleContribution, setEditIsFlexibleContribution] = useState(false);
   const [editTargetGoal, setEditTargetGoal] = useState("");
+  const [editDeadline, setEditDeadline] = useState("");
 
   const loadDashboardData = async (groupId: string) => {
     try {
@@ -245,6 +246,8 @@ export default function DashboardView() {
           const membersCount = mappedMembers.length || 1;
           calculatedGoal = Number(settings.sharePrice) * Number(settings.maxShares) * membersCount;
         }
+      } else if (currentGroup?.type === "general") {
+        calculatedGoal = Number(settings.targetGoal || 5000);
       }
       setGroupTargetGoal(calculatedGoal);
 
@@ -800,17 +803,18 @@ export default function DashboardView() {
     setEditWalletProvider(walletProvider);
     setEditWalletNum(walletNum);
     setEditWalletHolderName(cycleSettings.walletHolderName || "");
-    setEditContributionAmount(String(cycleSettings.contributionAmount || "150"));
+    setEditContributionAmount(String(cycleSettings.contributionAmount !== undefined ? cycleSettings.contributionAmount : (groupType === "general" ? "100" : "150")));
     setEditFrequency(cycleSettings.frequency || "anytime");
     setEditRotationMethod(cycleSettings.rotationMethod || "manual");
     setEditIsFlexibleContribution(!!cycleSettings.isFlexibleContribution);
-    setEditTargetGoal(String(cycleSettings.targetGoal || "6000"));
+    setEditTargetGoal(String(cycleSettings.targetGoal !== undefined ? cycleSettings.targetGoal : (groupType === "general" ? "5000" : "6000")));
     setEditSharePrice(String(cycleSettings.sharePrice || "150"));
     setEditMaxShares(String(cycleSettings.maxShares || "10"));
     setEditDividendCycle(cycleSettings.dividendCycle || "seasonal");
     setEditMinBalanceToBorrow(String(cycleSettings.minBalanceToBorrow || "500"));
     setEditInterestRate(String(cycleSettings.interestRate || "5"));
     setEditLoanTermMonths(String(cycleSettings.loanTermMonths || "3"));
+    setEditDeadline(cycleSettings.deadline || "");
     setIsEditingCycleSettings(true);
   };
 
@@ -843,6 +847,11 @@ export default function DashboardView() {
         updatedCycleSettings.minBalanceToBorrow = Number(editMinBalanceToBorrow) || 500;
         updatedCycleSettings.interestRate = Number(editInterestRate) || 5;
         updatedCycleSettings.loanTermMonths = Number(editLoanTermMonths) || 3;
+      } else if (groupType === "general") {
+        updatedCycleSettings.contributionAmount = editIsFlexibleContribution ? 0 : (Number(editContributionAmount) || 100);
+        updatedCycleSettings.isFlexibleContribution = editIsFlexibleContribution;
+        updatedCycleSettings.targetGoal = Number(editTargetGoal) || 5000;
+        updatedCycleSettings.deadline = editDeadline;
       }
 
       const { error: updateErr } = await supabase
@@ -908,6 +917,17 @@ export default function DashboardView() {
     document.body.removeChild(link);
   };
 
+  const handleLogout = async () => {
+    try {
+      const supabase = getSupabaseClient();
+      await supabase.auth.signOut();
+      router.push("/");
+    } catch (err) {
+      console.error("Error logging out:", err);
+      window.location.href = "/";
+    }
+  };
+
   const switchActiveGroup = (selected: { id: string; name: string; type: string }) => {
     setIsGroupDropdownOpen(false);
     router.push(`/dashboard?id=${selected.id}`);
@@ -923,7 +943,7 @@ export default function DashboardView() {
       case "members": return "Members Directory";
       case "contributions": return "Mobile Money Audit Logs";
       case "loans": return groupType === "sacco" ? "Loans & Repayments" : "Co-op Share Registry";
-      case "cycle": return "Cycle Settings";
+      case "cycle": return "Group Settings";
     }
   };
 
@@ -944,12 +964,11 @@ export default function DashboardView() {
     <div className="flex h-full w-full overflow-hidden relative">
       
       {/* 1. LEFT SIDEBAR PANEL (Desktop persistent, Mobile sliding drawer) */}
-      <aside className={`fixed inset-y-0 left-0 z-40 w-64 bg-[#001C3D] text-white flex flex-col justify-between shrink-0 transition-transform duration-300 md:translate-x-0 md:relative ${
+      <aside className={`fixed inset-y-0 left-0 z-[60] w-64 bg-[#001C3D] text-white flex flex-col justify-between shrink-0 transition-transform duration-300 md:translate-x-0 md:relative ${
         isSidebarOpen ? "translate-x-0" : "-translate-x-full"
       }`}>
-        
         {/* Top: Branding + Switcher */}
-        <div>
+        <div className="overflow-y-auto flex-1">
           {/* Brand header */}
           <div className="h-16 flex items-center justify-between px-6 border-b border-white/10 shrink-0">
             <a href="/" className="flex items-center gap-2 group">
@@ -981,7 +1000,7 @@ export default function DashboardView() {
             {isGroupDropdownOpen && (
               <div className="absolute left-4 right-4 mt-2 bg-[#00224b] border border-white/10 rounded-xl overflow-hidden shadow-2xl z-50">
                 <div className="py-1">
-                  <p className="px-3 py-1.5 text-[9px] font-bold text-white/40 uppercase tracking-widest border-b border-white/5">Switch Circles</p>
+                  <p className="px-3 py-1.5 text-[9px] font-bold text-white/40 uppercase tracking-widest border-b border-white/5">Switch Groups</p>
                   {alternateGroups.map((g) => (
                     <button
                       key={g.id}
@@ -992,6 +1011,17 @@ export default function DashboardView() {
                       <span className="text-[9px] uppercase px-1.5 py-0.5 rounded bg-white/10 text-white/60 font-light">{g.type}</span>
                     </button>
                   ))}
+                  
+                  <button
+                    onClick={() => {
+                      setIsGroupDropdownOpen(false);
+                      router.push("/create-group");
+                    }}
+                    className="w-full text-left px-4 py-2.5 text-xs font-bold text-[#38bdf8] hover:text-white hover:bg-white/5 flex items-center gap-2 transition-colors cursor-pointer border-t border-white/5"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    <span>Create New Group</span>
+                  </button>
                 </div>
               </div>
             )}
@@ -1058,7 +1088,7 @@ export default function DashboardView() {
               }`}
             >
               <Settings className="h-4 w-4" />
-              <span>Cycle Settings</span>
+              <span>Group Settings</span>
             </button>
           </nav>
         </div>
@@ -1085,7 +1115,7 @@ export default function DashboardView() {
               </div>
             </div>
             <button
-              onClick={() => window.location.href = "/"}
+              onClick={handleLogout}
               className="text-white/40 hover:text-[#E11900] transition-colors p-1"
               title="Logout"
             >
@@ -1099,7 +1129,7 @@ export default function DashboardView() {
       {isSidebarOpen && (
         <div 
           onClick={() => setIsSidebarOpen(false)}
-          className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-30 md:hidden" 
+          className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[55] md:hidden" 
         />
       )}
 
@@ -1482,16 +1512,16 @@ export default function DashboardView() {
                             .map(tx => tx.memberId)
                         );
                         const nextRecipient = members.find(m => !paidMemberIds.has(m.id));
-                        const recipientName = nextRecipient ? nextRecipient.name : "Cycle Completed";
+                        const recipientName = nextRecipient ? nextRecipient.name : "Rotation Completed";
                         
                         const freq = cycleSettings.frequency || "weekly";
-                        const frequencyText = freq === "weekly" ? "Cycle runs weekly." : freq === "monthly" ? "Cycle runs monthly." : `Cycle runs: ${freq}`;
+                        const frequencyText = freq === "weekly" ? "Group rotation runs weekly." : freq === "monthly" ? "Group rotation runs monthly." : `Group rotation runs: ${freq}`;
 
                         return (
                           <div className="bg-white border border-[#EBEBEB] rounded-2xl p-6 shadow-xs flex flex-col justify-between h-[160px]">
                             <div className="flex justify-between items-start">
                               <div>
-                                <p className="text-xs font-bold text-[#545658]/60 uppercase tracking-wider">Rotation Cycle</p>
+                                <p className="text-xs font-bold text-[#545658]/60 uppercase tracking-wider">Group Rotation</p>
                                 <p className="text-lg font-extrabold text-[#001C3D] mt-2 font-display">
                                   Active Rotation
                                 </p>
@@ -1531,7 +1561,7 @@ export default function DashboardView() {
                     <div className="bg-white border border-[#EBEBEB] rounded-[20px] p-6 shadow-xs lg:col-span-2 flex flex-col justify-between relative min-h-[300px]">
                       <div>
                         <h4 className="text-sm font-bold text-[#001C3D] uppercase tracking-wider">Capital Growth Trend</h4>
-                        <p className="text-xs text-[#545658]/70 font-light mt-1">Village bank savings accumulated over current cycle (ZMW)</p>
+                        <p className="text-xs text-[#545658]/70 font-light mt-1">Village bank savings accumulated in this group (ZMW)</p>
                       </div>
 
                       {/* Line chart graphic */}
@@ -1648,7 +1678,7 @@ export default function DashboardView() {
                     {/* Cycle collection gauge & Split breakdown */}
                     <div className="bg-white border border-[#EBEBEB] rounded-[20px] p-6 shadow-xs flex flex-col justify-between min-h-[300px]">
                       <div>
-                        <h4 className="text-sm font-bold text-[#001C3D] uppercase tracking-wider">Cycle Progress</h4>
+                        <h4 className="text-sm font-bold text-[#001C3D] uppercase tracking-wider">Group Progress</h4>
                         <p className="text-xs text-[#545658]/70 font-light mt-1">Status of collection target goals</p>
                       </div>
 
@@ -2022,7 +2052,7 @@ export default function DashboardView() {
                     <div className="bg-white border border-[#EBEBEB] rounded-2xl p-6 shadow-xs flex flex-col justify-between">
                       <div>
                         <h4 className="text-xs font-bold text-[#545658]/60 uppercase tracking-wider">Interest Engine status</h4>
-                        <p className="text-xs font-semibold text-[#001C3D] mt-2">Cycle Rate Rule: 5% monthly simple interest</p>
+                        <p className="text-xs font-semibold text-[#001C3D] mt-2">Group Rate Rule: 5% monthly simple interest</p>
                       </div>
                       <button
                         onClick={() => setIsDisbursementModalOpen(true)}
@@ -2038,7 +2068,7 @@ export default function DashboardView() {
               {activeTab === "cycle" && (
                 <div className="bg-white border border-[#EBEBEB] rounded-[20px] p-6 shadow-xs space-y-6 animate-fade-in">
                   <div className="flex justify-between items-center border-b border-[#EBEBEB] pb-4">
-                    <h3 className="text-sm font-bold text-[#001C3D] uppercase tracking-wider">Active Group Cycle Specifications</h3>
+                    <h3 className="text-sm font-bold text-[#001C3D] uppercase tracking-wider">Active Group Specifications</h3>
                     {!isEditingCycleSettings ? (
                       userRole === "Group Treasurer" && (
                         <button
@@ -2088,7 +2118,7 @@ export default function DashboardView() {
                         <p className="font-bold text-[#001C3D] border-b border-[#EBEBEB] pb-1.5">Group Information</p>
                         <div className="flex flex-col gap-1.5">
                           <span className="font-semibold text-slate-500">Structure</span>
-                          <span className="capitalize font-bold text-[#001C3D]">{groupType} Circle</span>
+                          <span className="capitalize font-bold text-[#001C3D]">{groupType} Group</span>
                         </div>
                         <div className="flex flex-col gap-1.5">
                           <label htmlFor="edit-location" className="font-semibold text-slate-500">City Node</label>
@@ -2141,7 +2171,7 @@ export default function DashboardView() {
 
                       {/* Bottom Span: Cycle Rules */}
                       <div className="space-y-4 md:col-span-2 border-t border-[#EBEBEB] pt-4">
-                        <p className="font-bold text-[#001C3D] border-b border-[#EBEBEB] pb-1.5">Active Cycle Rules</p>
+                        <p className="font-bold text-[#001C3D] border-b border-[#EBEBEB] pb-1.5">Active Group Rules</p>
                         
                         {groupType === "savings" && (
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -2229,7 +2259,7 @@ export default function DashboardView() {
                               />
                             </div>
                             <div className="flex flex-col gap-1.5">
-                              <label htmlFor="edit-div-cycle" className="font-semibold text-slate-500">Dividend Payout Cycle</label>
+                              <label htmlFor="edit-div-cycle" className="font-semibold text-slate-500">Dividend Payout Schedule</label>
                               <input
                                 type="text"
                                 id="edit-div-cycle"
@@ -2276,13 +2306,62 @@ export default function DashboardView() {
                             </div>
                           </div>
                         )}
+                        {groupType === "general" && (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="flex flex-col gap-1.5">
+                              <label htmlFor="edit-contrib-amount" className="font-semibold text-slate-500">Contribution Amount (ZMW)</label>
+                              <input
+                                type="number"
+                                id="edit-contrib-amount"
+                                value={editIsFlexibleContribution ? "" : editContributionAmount}
+                                disabled={editIsFlexibleContribution}
+                                onChange={(e) => setEditContributionAmount(e.target.value)}
+                                className={`border rounded-lg p-2.5 focus:outline-none focus:ring-1 focus:ring-[#0070BA] text-xs font-medium ${
+                                  editIsFlexibleContribution ? "bg-gray-50 text-gray-400 cursor-not-allowed border-[#EBEBEB]" : "bg-white"
+                                }`}
+                              />
+                            </div>
+                            <div className="flex flex-col gap-1.5">
+                              <label htmlFor="edit-target-goal" className="font-semibold text-slate-500">Target Savings Goal (ZMW)</label>
+                              <input
+                                type="number"
+                                id="edit-target-goal"
+                                value={editTargetGoal}
+                                onChange={(e) => setEditTargetGoal(e.target.value)}
+                                className="border border-[#EBEBEB] rounded-lg p-2.5 focus:outline-none focus:ring-1 focus:ring-[#0070BA] bg-white text-xs font-medium"
+                              />
+                            </div>
+                            <div className="flex flex-col gap-1.5">
+                              <label htmlFor="edit-deadline" className="font-semibold text-slate-500">Target Deadline / End Date</label>
+                              <input
+                                type="date"
+                                id="edit-deadline"
+                                value={editDeadline}
+                                onChange={(e) => setEditDeadline(e.target.value)}
+                                className="border border-[#EBEBEB] rounded-lg p-2.5 focus:outline-none focus:ring-1 focus:ring-[#0070BA] bg-white text-xs font-medium"
+                              />
+                            </div>
+                            <div className="flex items-center gap-2 sm:col-span-2 pt-2">
+                              <input
+                                type="checkbox"
+                                id="edit-flexible-contrib"
+                                checked={editIsFlexibleContribution}
+                                onChange={(e) => setEditIsFlexibleContribution(e.target.checked)}
+                                className="h-4 w-4 rounded border-gray-300 text-[#0070BA] focus:ring-[#0070BA] cursor-pointer"
+                              />
+                              <label htmlFor="edit-flexible-contrib" className="text-xs font-bold text-slate-700 cursor-pointer">
+                                Allow members to deposit any amount (disable fixed contribution)
+                              </label>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs text-[#545658] animate-fade-in">
                       <div className="space-y-2">
                         <p className="font-bold text-[#001C3D] border-b border-[#EBEBEB] pb-1.5">Group Information</p>
-                        <p>Structure: <span className="capitalize font-semibold">{groupType} Circle</span></p>
+                        <p>Structure: <span className="capitalize font-semibold">{groupType} Group</span></p>
                         <p>City Node: {locationName}, Zambia</p>
                         <p>System Token ID: <span className="font-mono">{groupRef}</span></p>
                       </div>
@@ -2293,7 +2372,7 @@ export default function DashboardView() {
                         {cycleSettings.walletHolderName && <p>Registered Holder: {cycleSettings.walletHolderName}</p>}
                       </div>
                       <div className="space-y-2 md:col-span-2">
-                        <p className="font-bold text-[#001C3D] border-b border-[#EBEBEB] pb-1.5">Active Cycle Rules</p>
+                        <p className="font-bold text-[#001C3D] border-b border-[#EBEBEB] pb-1.5">Active Group Rules</p>
                         {groupType === "savings" && (
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <p>Contribution Amount: <span className="font-semibold text-[#001C3D]">{cycleSettings.isFlexibleContribution ? "Flexible (Any Amount)" : `ZMW ${cycleSettings.contributionAmount || 0}`}</span></p>
@@ -2306,7 +2385,7 @@ export default function DashboardView() {
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <p>Share Price: <span className="font-semibold text-[#001C3D]">ZMW {cycleSettings.sharePrice || 0}</span></p>
                             <p>Maximum Shares Limit: <span className="font-semibold text-[#001C3D]">{cycleSettings.maxShares || 0} Shares</span></p>
-                            <p>Dividend Payout Cycle: <span className="capitalize font-semibold">{cycleSettings.dividendCycle || "seasonal"}</span></p>
+                            <p>Dividend Payout Schedule: <span className="capitalize font-semibold">{cycleSettings.dividendCycle || "seasonal"}</span></p>
                           </div>
                         )}
                         {groupType === "sacco" && (
@@ -2314,6 +2393,13 @@ export default function DashboardView() {
                             <p>Minimum Balance to Borrow: <span className="font-semibold text-[#001C3D]">ZMW {cycleSettings.minBalanceToBorrow || 0}</span></p>
                             <p>Simple Interest Rate: <span className="font-semibold text-[#001C3D]">{cycleSettings.interestRate || 5}% monthly</span></p>
                             <p>Loan Repayment Term: <span className="font-semibold text-[#001C3D]">{cycleSettings.loanTermMonths || 3} Months</span></p>
+                          </div>
+                        )}
+                        {groupType === "general" && (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <p>Contribution Amount: <span className="font-semibold text-[#001C3D]">{cycleSettings.isFlexibleContribution ? "Flexible (Any Amount)" : `ZMW ${cycleSettings.contributionAmount || 0}`}</span></p>
+                            <p>Target Savings Goal: <span className="font-semibold text-[#001C3D]">ZMW {cycleSettings.targetGoal || 5000}</span></p>
+                            {cycleSettings.deadline && <p>Target Deadline: <span className="font-semibold text-[#001C3D]">{new Date(cycleSettings.deadline).toLocaleDateString()}</span></p>}
                           </div>
                         )}
                       </div>
@@ -2324,7 +2410,7 @@ export default function DashboardView() {
                     <div className="space-y-3 md:col-span-2 border-t border-[#EBEBEB] pt-6 mt-2">
                       <p className="font-bold text-[#001C3D]">Rename Group Node</p>
                       <p className="text-[11px] text-[#545658]/70 leading-relaxed font-light">
-                        Propose a new name for this group circle. For security and trust compliance, the name change will only become active once at least one other registered member approves the change.
+                        Propose a new name for this group. For security and trust compliance, the name change will only become active once at least one other registered member approves the change.
                       </p>
                       
                       {pendingProposal ? (

@@ -106,7 +106,7 @@ export default function InviteView() {
         return;
       }
 
-      setSuccessMessage(`Welcome! You have successfully joined ${groupInfo?.name || "the circle"} immediately.`);
+      setSuccessMessage(`Welcome! You have successfully joined ${groupInfo?.name || "the group"} immediately.`);
       
       // Auto redirect to login page after 3 seconds
       setTimeout(() => {
@@ -178,7 +178,7 @@ export default function InviteView() {
                 <div className="overflow-hidden">
                   <p className="text-[10px] font-bold text-[#0070BA] uppercase tracking-wider">Invitation To Join</p>
                   <h2 className="text-base font-extrabold text-[#001C3D] truncate mt-0.5">{groupInfo?.name}</h2>
-                  <p className="text-[10px] text-[#545658] font-light capitalize">{groupInfo?.type} Circle • {groupInfo?.location}</p>
+                  <p className="text-[10px] text-[#545658] font-light capitalize">{groupInfo?.type} Group • {groupInfo?.location}</p>
                 </div>
               </div>
 
@@ -294,7 +294,7 @@ export default function InviteView() {
                       <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                     ) : (
                       <>
-                        <span>Join Group Circle</span>
+                        <span>Join Group</span>
                         <ArrowRight className="h-4 w-4" />
                       </>
                     )}

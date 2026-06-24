@@ -19,7 +19,7 @@ export default function Hero() {
 
           {/* Subheading */}
           <p className="mt-8 text-lg sm:text-xl text-[#2C2E2F] leading-relaxed max-w-2xl font-light">
-            Digitize your savings circle, cooperative, or SACCO. Request contributions via Airtel Money and MTN MoMo, and track every Kwacha automatically in your group ledger.
+            Digitize your savings group, cooperative, or SACCO. Request contributions via Airtel Money and MTN MoMo, and track every Kwacha automatically in your group ledger.
           </p>
 
           {/* Action Buttons */}

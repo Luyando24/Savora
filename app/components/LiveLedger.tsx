@@ -17,7 +17,7 @@ interface Transaction {
 
 const groupMetadata = {
   savings: {
-    name: "Tigwilizane Savings Circle",
+    name: "Tigwilizane Savings Group",
     typeLabel: "Savings Group (Chilimba)",
     initialBalance: 3500,
     increment: 500,

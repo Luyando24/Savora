@@ -30,20 +30,20 @@ export default function Header() {
         </div>
 
         {/* Right Side: Action Buttons */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 sm:gap-4">
           <Link
             href="/login"
-            className="text-[14px] font-bold text-[#0070BA] border border-[#0070BA] hover:bg-[#0070BA]/5 px-6 py-2.5 rounded-full transition-all duration-150 active:scale-95"
+            className="text-xs sm:text-[14px] font-bold text-[#0070BA] border border-[#0070BA] hover:bg-[#0070BA]/5 px-3 py-1.5 sm:px-6 sm:py-2.5 rounded-full transition-all duration-150 active:scale-95 shrink-0"
             id="nav-login-btn"
           >
             Log In
           </Link>
           <Link
             href="/create-group"
-            className="inline-flex items-center gap-2 bg-[#0070BA] text-white text-[14px] font-bold px-6 py-2.5 rounded-full hover:bg-[#005EA6] active:scale-95 transition-all duration-150"
+            className="inline-flex items-center gap-1 sm:gap-2 bg-[#0070BA] text-white text-xs sm:text-[14px] font-bold px-3 py-1.5 sm:px-6 sm:py-2.5 rounded-full hover:bg-[#005EA6] active:scale-95 transition-all duration-150 shrink-0"
             id="nav-signup-btn"
           >
-            <ShieldCheck className="h-4 w-4" />
+            <ShieldCheck className="h-3.5 w-3.5 hidden sm:inline" />
             <span>Sign Up</span>
           </Link>
         </div>

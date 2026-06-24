@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { 
   Users, 
@@ -17,9 +17,10 @@ import {
   AlertCircle,
   HelpCircle
 } from "lucide-react";
+import { getSupabaseClient } from "@/app/lib/supabase";
 
 interface GroupFormData {
-  type: "savings" | "agricultural" | "sacco";
+  type: "savings" | "agricultural" | "sacco" | "general";
   name: string;
   location: string;
   description: string;
@@ -40,6 +41,12 @@ interface GroupFormData {
   saccoMinBalanceToBorrow: string;
   saccoInterestRate: string;
   saccoLoanTermMonths: string;
+
+  // General savings rules
+  generalContributionAmount: string;
+  generalIsFlexibleContribution: boolean;
+  generalTargetGoal: string;
+  generalDeadline: string;
   
   // Mobile money wallet settings
   walletProvider: "mtn" | "airtel";
@@ -71,6 +78,11 @@ const initialFormData: GroupFormData = {
   saccoMinBalanceToBorrow: "500",
   saccoInterestRate: "5",
   saccoLoanTermMonths: "3",
+
+  generalContributionAmount: "100",
+  generalIsFlexibleContribution: true,
+  generalTargetGoal: "5000",
+  generalDeadline: "",
   
   walletProvider: "mtn",
   walletNumber: "",
@@ -111,9 +123,32 @@ export default function CreateGroupForm() {
   const [step, setStep] = useState<number>(1);
   const [formData, setFormData] = useState<GroupFormData>(initialFormData);
   const [errors, setErrors] = useState<Partial<Record<keyof GroupFormData | "general", string>>>({});
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [authToken, setAuthToken] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [createdGroupId, setCreatedGroupId] = useState("");
+
+  useEffect(() => {
+    const checkSession = async () => {
+      try {
+        const supabase = getSupabaseClient();
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          setIsLoggedIn(true);
+          setAuthToken(session.access_token);
+          setFormData((prev) => ({
+            ...prev,
+            treasurerEmail: session.user.email || "",
+            treasurerName: session.user.user_metadata?.full_name || session.user.user_metadata?.name || ""
+          }));
+        }
+      } catch (err) {
+        console.error("Error checking session:", err);
+      }
+    };
+    checkSession();
+  }, []);
 
   const updateField = (key: keyof GroupFormData, value: any) => {
     setFormData((prev) => ({ ...prev, [key]: value }));
@@ -181,6 +216,17 @@ export default function CreateGroupForm() {
         if (isNaN(term) || term <= 0) {
           newErrors.saccoLoanTermMonths = "Loan term must be at least 1 month.";
         }
+      } else if (formData.type === "general") {
+        if (!formData.generalIsFlexibleContribution) {
+          const amt = parseFloat(formData.generalContributionAmount);
+          if (isNaN(amt) || amt <= 0) {
+            newErrors.generalContributionAmount = "Contribution amount must be a positive number.";
+          }
+        }
+        const target = parseFloat(formData.generalTargetGoal);
+        if (isNaN(target) || target <= 0) {
+          newErrors.generalTargetGoal = "Target savings goal must be a positive number.";
+        }
       }
     }
 
@@ -211,10 +257,12 @@ export default function CreateGroupForm() {
         newErrors.treasurerEmail = "Please enter a valid email address.";
       }
 
-      if (!formData.treasurerPassword) {
-        newErrors.treasurerPassword = "Password is required for credentials.";
-      } else if (formData.treasurerPassword.length < 6) {
-        newErrors.treasurerPassword = "Password must be at least 6 characters.";
+      if (!isLoggedIn) {
+        if (!formData.treasurerPassword) {
+          newErrors.treasurerPassword = "Password is required for credentials.";
+        } else if (formData.treasurerPassword.length < 6) {
+          newErrors.treasurerPassword = "Password must be at least 6 characters.";
+        }
       }
     }
 
@@ -254,18 +302,28 @@ export default function CreateGroupForm() {
           sharePrice: parseFloat(formData.coopSharePrice) || 0,
           maxShares: parseInt(formData.coopMaxShares) || 0,
           dividendCycle: formData.coopDividendCycle
-        } : {
+        } : formData.type === "sacco" ? {
           minBalanceToBorrow: parseFloat(formData.saccoMinBalanceToBorrow) || 0,
           interestRate: parseFloat(formData.saccoInterestRate) || 0,
           loanTermMonths: parseInt(formData.saccoLoanTermMonths) || 0
+        } : {
+          contributionAmount: formData.generalIsFlexibleContribution ? 0 : (parseFloat(formData.generalContributionAmount) || 0),
+          isFlexibleContribution: formData.generalIsFlexibleContribution,
+          targetGoal: parseFloat(formData.generalTargetGoal) || 5000,
+          deadline: formData.generalDeadline || ""
         })
       };
 
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+      if (authToken) {
+        headers["Authorization"] = `Bearer ${authToken}`;
+      }
+
       const response = await fetch("/api/groups/create", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers,
         body: JSON.stringify({
           name: formData.name,
           type: formData.type,
@@ -273,7 +331,7 @@ export default function CreateGroupForm() {
           rules,
           treasurerName: formData.treasurerName,
           treasurerEmail: formData.treasurerEmail,
-          treasurerPassword: formData.treasurerPassword,
+          treasurerPassword: isLoggedIn ? "" : formData.treasurerPassword,
         }),
       });
 
@@ -325,7 +383,7 @@ export default function CreateGroupForm() {
             </div>
             <div className="flex justify-between">
               <dt className="font-light">Structure:</dt>
-              <dd className="capitalize text-[#001C3D] font-medium">{formData.type} Circle</dd>
+              <dd className="capitalize text-[#001C3D] font-medium">{formData.type} Group</dd>
             </div>
             <div className="flex justify-between">
               <dt className="font-light">Location:</dt>
@@ -428,7 +486,7 @@ export default function CreateGroupForm() {
       </div>
 
       {/* Main Form container */}
-      <form onSubmit={handleSubmit} className="bg-white rounded-[24px] border border-[#EBEBEB] shadow-md p-6 md:p-10">
+      <form onSubmit={handleSubmit} className="bg-white rounded-[24px] border border-[#EBEBEB] shadow-md p-6 md:p-10 pb-28 md:pb-10">
         
         {/* Step 1: Select Group Type */}
         {step === 1 && (
@@ -446,7 +504,7 @@ export default function CreateGroupForm() {
               )}
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               {/* Option 1: Chilimba */}
               <div
                 onClick={() => updateField("type", "savings")}
@@ -466,7 +524,7 @@ export default function CreateGroupForm() {
                 </div>
                 <h3 className="text-lg font-bold text-[#001C3D] mb-2">Savings Group (Chilimba)</h3>
                 <p className="text-xs text-[#545658] font-light leading-relaxed mb-4">
-                  For informal savings circles where members contribute fixed amounts regularly and payout rotated amounts.
+                  For informal savings groups where members contribute fixed amounts regularly and payout rotated amounts.
                 </p>
                 <div className="border-t border-[#EBEBEB] pt-4 mt-auto">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-[#0070BA] bg-[#0070BA]/10 px-2 py-0.5 rounded">
@@ -530,6 +588,34 @@ export default function CreateGroupForm() {
                   </span>
                 </div>
               </div>
+
+              {/* Option 4: General Savings / Fundraising */}
+              <div
+                onClick={() => updateField("type", "general")}
+                className={`group border rounded-[20px] p-6 cursor-pointer transition-all duration-150 relative ${
+                  formData.type === "general"
+                    ? "border-[#0070BA] bg-[#0070BA]/5 ring-1 ring-[#0070BA]"
+                    : "border-[#EBEBEB] hover:border-gray-300 bg-white"
+                }`}
+              >
+                {formData.type === "general" && (
+                  <div className="absolute top-4 right-4 h-6 w-6 rounded-full bg-[#0070BA] text-white flex items-center justify-center">
+                    <Check className="h-3.5 w-3.5 stroke-[3px]" />
+                  </div>
+                )}
+                <div className="h-12 w-12 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center mb-6">
+                  <Coins className="h-6 w-6" />
+                </div>
+                <h3 className="text-lg font-bold text-[#001C3D] mb-2">General Savings / Fundraising</h3>
+                <p className="text-xs text-[#545658] font-light leading-relaxed mb-4">
+                  For general savings, such as wedding committees, funeral expenses, community projects, and causes with a shared target goal.
+                </p>
+                <div className="border-t border-[#EBEBEB] pt-4 mt-auto">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 bg-amber-100 px-2 py-0.5 rounded">
+                    Flexible Targets
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -555,7 +641,7 @@ export default function CreateGroupForm() {
                   id="group-name"
                   value={formData.name}
                   onChange={(e) => updateField("name", e.target.value)}
-                  placeholder="e.g. Tusunge Savings Circle"
+                  placeholder="e.g. Tusunge Savings Group"
                   className={`border rounded-lg p-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0070BA] ${
                     errors.name ? "border-[#E11900] bg-[#E11900]/5" : "border-[#EBEBEB]"
                   }`}
@@ -631,7 +717,7 @@ export default function CreateGroupForm() {
             <div>
               <h2 className="text-2xl font-extrabold text-[#001C3D] tracking-tight">Configure Group Rules</h2>
               <p className="text-sm text-[#545658] font-light mt-1">
-                Customize the contribution rates and parameters for your {formData.type === "savings" ? "Chilimba Circle" : formData.type === "agricultural" ? "Cooperative" : "SACCO"}.
+                Customize the contribution rates and parameters for your {formData.type === "savings" ? "Chilimba Group" : formData.type === "agricultural" ? "Cooperative" : "SACCO"}.
               </p>
             </div>
 
@@ -882,6 +968,85 @@ export default function CreateGroupForm() {
                   </div>
                   {errors.saccoLoanTermMonths && <span className="text-xs text-[#E11900] font-medium">{errors.saccoLoanTermMonths}</span>}
                 </div>
+              </div>
+            )}
+
+            {/* Conditional Fields: General Savings / Fundraising */}
+            {formData.type === "general" && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-fade-in">
+                {/* Target savings goal */}
+                <div className="flex flex-col gap-2">
+                  <label htmlFor="general-target" className="text-sm font-bold text-[#001C3D]">
+                    Target savings goal (ZMW)
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-3.5 text-sm text-[#545658] font-semibold">ZMW</span>
+                    <input
+                      type="number"
+                      id="general-target"
+                      value={formData.generalTargetGoal}
+                      onChange={(e) => updateField("generalTargetGoal", e.target.value)}
+                      placeholder="5000"
+                      className={`w-full border rounded-lg p-3 pl-12 text-sm focus:outline-none focus:ring-1 focus:ring-[#0070BA] ${
+                        errors.generalTargetGoal ? "border-[#E11900]" : "border-[#EBEBEB]"
+                      }`}
+                    />
+                  </div>
+                  {errors.generalTargetGoal && <span className="text-xs text-[#E11900] font-medium">{errors.generalTargetGoal}</span>}
+                </div>
+
+                {/* Target deadline */}
+                <div className="flex flex-col gap-2">
+                  <label htmlFor="general-deadline" className="text-sm font-bold text-[#001C3D]">
+                    Target Deadline / End Date (Optional)
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="date"
+                      id="general-deadline"
+                      value={formData.generalDeadline}
+                      onChange={(e) => updateField("generalDeadline", e.target.value)}
+                      className="w-full border border-[#EBEBEB] rounded-lg p-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#0070BA] bg-white font-medium"
+                    />
+                  </div>
+                </div>
+
+                {/* Flexible Contribution option */}
+                <div className="flex items-center gap-2 md:col-span-2 pt-2">
+                  <input
+                    type="checkbox"
+                    id="general-flexible-contrib"
+                    checked={formData.generalIsFlexibleContribution}
+                    onChange={(e) => updateField("generalIsFlexibleContribution", e.target.checked)}
+                    className="h-4 w-4 rounded border-gray-300 text-[#0070BA] focus:ring-[#0070BA] cursor-pointer"
+                  />
+                  <label htmlFor="general-flexible-contrib" className="text-xs font-bold text-slate-700 cursor-pointer">
+                    Allow members to deposit any amount (disable fixed contribution)
+                  </label>
+                </div>
+
+                {/* Fixed Contribution amount (hidden if flexible) */}
+                {!formData.generalIsFlexibleContribution && (
+                  <div className="flex flex-col gap-2 md:col-span-2 animate-fade-in">
+                    <label htmlFor="general-contrib-amt" className="text-sm font-bold text-[#001C3D]">
+                      Fixed Contribution Rate per Member (ZMW)
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-3.5 text-sm text-[#545658] font-semibold">ZMW</span>
+                      <input
+                        type="number"
+                        id="general-contrib-amt"
+                        value={formData.generalContributionAmount}
+                        onChange={(e) => updateField("generalContributionAmount", e.target.value)}
+                        placeholder="100"
+                        className={`w-full border rounded-lg p-3 pl-12 text-sm focus:outline-none focus:ring-1 focus:ring-[#0070BA] ${
+                          errors.generalContributionAmount ? "border-[#E11900]" : "border-[#EBEBEB]"
+                        }`}
+                      />
+                    </div>
+                    {errors.generalContributionAmount && <span className="text-xs text-[#E11900] font-medium">{errors.generalContributionAmount}</span>}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -1148,30 +1313,41 @@ export default function CreateGroupForm() {
                     value={formData.treasurerEmail}
                     onChange={(e) => updateField("treasurerEmail", e.target.value)}
                     placeholder="mwansa@example.com"
+                    disabled={isLoggedIn}
                     className={`border rounded-lg p-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-[#0070BA] ${
-                      errors.treasurerEmail ? "border-[#E11900]" : "border-[#EBEBEB]"
+                      isLoggedIn ? "bg-gray-50 text-gray-500 cursor-not-allowed border-[#EBEBEB]" : errors.treasurerEmail ? "border-[#E11900]" : "border-[#EBEBEB]"
                     }`}
                   />
                   {errors.treasurerEmail && <span className="text-xs text-[#E11900] font-medium">{errors.treasurerEmail}</span>}
                 </div>
 
-                {/* Admin password */}
-                <div className="flex flex-col gap-2">
-                  <label htmlFor="treasurer-password" className="text-xs font-bold text-[#545658]">
-                    Create Login Password
-                  </label>
-                  <input
-                    type="password"
-                    id="treasurer-password"
-                    value={formData.treasurerPassword}
-                    onChange={(e) => updateField("treasurerPassword", e.target.value)}
-                    placeholder="Min 6 characters"
-                    className={`border rounded-lg p-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-[#0070BA] ${
-                      errors.treasurerPassword ? "border-[#E11900]" : "border-[#EBEBEB]"
-                    }`}
-                  />
-                  {errors.treasurerPassword && <span className="text-xs text-[#E11900] font-medium">{errors.treasurerPassword}</span>}
-                </div>
+                {/* Admin password or confirmation banner */}
+                {isLoggedIn ? (
+                  <div className="md:col-span-1 border border-[#0070BA]/20 bg-[#0070BA]/5 rounded-xl p-3 flex items-start gap-2.5">
+                    <Check className="h-5 w-5 text-[#0070BA] shrink-0 mt-0.5" />
+                    <div className="text-[11px] leading-relaxed text-[#545658]">
+                      <p className="font-bold text-[#001C3D]">Linked Account Active</p>
+                      <p className="font-light mt-0.5">This group will automatically link to your current active session. No new password required.</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    <label htmlFor="treasurer-password" className="text-xs font-bold text-[#545658]">
+                      Create Login Password
+                    </label>
+                    <input
+                      type="password"
+                      id="treasurer-password"
+                      value={formData.treasurerPassword}
+                      onChange={(e) => updateField("treasurerPassword", e.target.value)}
+                      placeholder="Min 6 characters"
+                      className={`border rounded-lg p-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-[#0070BA] ${
+                        errors.treasurerPassword ? "border-[#E11900]" : "border-[#EBEBEB]"
+                      }`}
+                    />
+                    {errors.treasurerPassword && <span className="text-xs text-[#E11900] font-medium">{errors.treasurerPassword}</span>}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -1182,8 +1358,7 @@ export default function CreateGroupForm() {
           </div>
         )}
 
-        {/* Action Buttons */}
-        <div className="mt-10 border-t border-[#EBEBEB] pt-6 flex justify-between items-center">
+        <div className="flex justify-between items-center fixed bottom-0 left-0 right-0 bg-white border-t border-[#EBEBEB] p-4 shadow-[0_-4px_12px_rgba(0,0,0,0.05)] z-40 md:relative md:border-t-0 md:bg-transparent md:p-0 md:shadow-none md:mt-10 md:pt-6 md:z-auto">
           {step > 1 ? (
             <button
               type="button"

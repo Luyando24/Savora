@@ -20,7 +20,7 @@ export default function CreateGroupPage() {
               Initialize Group Ledger
             </h1>
             <p className="mt-3 text-[16px] text-[#545658] font-light leading-relaxed">
-              Digitize your savings circle, agricultural cooperative, or SACCO in Zambia. Configure your custom rules and link your Airtel or MTN merchant wallet.
+              Digitize your savings group, agricultural cooperative, or SACCO in Zambia. Configure your custom rules and link your Airtel or MTN merchant wallet.
             </p>
           </div>
 
